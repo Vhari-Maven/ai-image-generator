@@ -11,6 +11,18 @@ A Python CLI tool for generating visual assets using multiple AI image generatio
 - **Structured Prompts**: JSON-based prompt management with metadata
 - **Progress Tracking**: Real-time progress bars and detailed reporting
 
+## Gallery
+
+<p align="center">
+  <img src="assets/examples/char-kael-advanced.png" alt="Kael the Guardian - Generated Character" width="280">
+  <img src="assets/examples/char-elara-advanced.png" alt="Elara the Forest Spirit - Generated Character" width="280">
+  <img src="assets/examples/char-shadow-lord-advanced.png" alt="Shadow Lord - Generated Character" width="280">
+</p>
+
+<p align="center">
+  <em>Examples generated with advanced structured prompts using Google GenAI</em>
+</p>
+
 ## Quick Start
 
 ### Installation
