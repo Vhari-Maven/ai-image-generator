@@ -1,0 +1,58 @@
+{
+  "metadata": {
+    "title": "Example AI Art Prompts",
+    "description": "Sample prompts demonstrating the AI Art Generator capabilities",
+    "author": "AI Art Generator",
+    "version": "1.0"
+  },
+  "prompts": [
+    {
+      "id": "bg-mystical-forest",
+      "category": "background",
+      "title": "Mystical Forest",
+      "filename": "bg-mystical-forest.png",
+      "description": "A magical forest with bioluminescent plants",
+      "prompt": "A mystical enchanted forest with glowing blue mushrooms, ethereal mist, ancient oak trees with twisted branches, soft magical lighting filtering through the canopy, bioluminescent flowers scattered on the forest floor, fantasy art style, high detail, atmospheric"
+    },
+    {
+      "id": "bg-crystal-cave",
+      "category": "background", 
+      "title": "Crystal Cave",
+      "filename": "bg-crystal-cave.png",
+      "description": "Underground cave filled with luminous crystals",
+      "prompt": "Deep underground crystal cave with massive luminous amethyst and quartz formations, prismatic light reflections, underground pools of clear water, stalactites and stalagmites, magical atmosphere, fantasy setting, detailed textures"
+    },
+    {
+      "id": "bg-floating-islands",
+      "category": "background",
+      "title": "Floating Islands",
+      "filename": "bg-floating-islands.png", 
+      "description": "Sky realm with floating landmasses",
+      "prompt": "Floating islands suspended in a twilight sky, waterfalls cascading into clouds below, ancient ruins on the islands, glowing crystals, dramatic lighting, fantasy landscape, aerial view, epic scale"
+    },
+    {
+      "id": "char-wise-sage",
+      "category": "character",
+      "title": "Wise Sage",
+      "filename": "char-wise-sage.png",
+      "description": "Elderly sage with mystical knowledge",
+      "prompt": "Portrait of a wise elderly sage with long silver hair and beard, wearing simple robes, kind eyes with ancient wisdom, holding a glowing crystal orb, fantasy character art, detailed facial features, warm lighting"
+    },
+    {
+      "id": "char-forest-guardian",
+      "category": "character",
+      "title": "Forest Guardian",
+      "filename": "char-forest-guardian.png",
+      "description": "Nature spirit protecting the woodland",
+      "prompt": "Forest guardian spirit with bark-like skin, hair made of leaves and vines, glowing green eyes, wearing natural armor of wood and moss, standing pose, fantasy character, nature magic, detailed texture work"
+    },
+    {
+      "id": "char-crystal-mage",
+      "category": "character",
+      "title": "Crystal Mage",
+      "filename": "char-crystal-mage.png",
+      "description": "Mage who channels crystal magic",
+      "prompt": "Crystal mage with crystalline staff, robes embedded with gems, blue magical energy emanating from hands, mysterious expression, fantasy character portrait, magical effects, high detail"
+    }
+  ]
+}

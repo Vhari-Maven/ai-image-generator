@@ -1,0 +1,128 @@
+# AI Art Generator Configuration
+# Copy this file to config.yaml and customize as needed
+
+# Generation Settings
+generation:
+  # Default number of images per prompt (can be overridden via CLI)
+  images_per_prompt: 1
+  
+  # Default service to use
+  default_service: "genai"
+  
+  # Image quality/format settings
+  image_format: "png"
+  optimize_images: true
+  
+  # Whether to embed prompt metadata in generated images
+  embed_metadata: true
+
+# Output Settings
+output:
+  # Whether to create timestamped backups when overwriting existing images
+  create_backups: true
+  
+  # Whether to organize images in subdirectories by category
+  organize_by_category: true
+
+# Google GenAI Specific Settings
+genai:
+  model: "imagen-3.0-generate-002"
+  
+  # Default settings for all generation
+  defaults:
+    aspect_ratio: "1:1"
+    safety_filter_level: "BLOCK_LOW_AND_ABOVE"
+    person_generation: "ALLOW_ADULT"
+  
+  # Category-specific overrides
+  categories:
+    background:
+      aspect_ratio: "16:9"
+      safety_filter_level: "BLOCK_LOW_AND_ABOVE"
+      person_generation: "ALLOW_ADULT"
+    
+    character:
+      aspect_ratio: "3:4" 
+      safety_filter_level: "BLOCK_LOW_AND_ABOVE"
+      person_generation: "ALLOW_ADULT"
+
+# OpenAI GPT-4o Specific Settings
+openai:
+  model: "gpt-image-1"
+  
+  # Default settings for all generation
+  defaults:
+    size: "1024x1024"
+    quality: "standard"
+    style: "natural"
+  
+  # Category-specific overrides
+  categories:
+    background:
+      size: "1536x1024"  # Landscape format for backgrounds
+      quality: "standard"
+      style: "natural"
+    
+    character:
+      size: "1024x1536"  # Portrait format for characters
+      quality: "standard"
+      style: "vivid"  # More vibrant for character portraits
+
+# Google Vertex AI Specific Settings (supports Imagen 3 and Imagen 4)
+vertex:
+  # Default model (can be overridden via CLI)
+  model: "imagen-4.0-generate-preview-06-06"
+  
+  # Google Cloud Project configuration
+  project_id: null  # Set via GOOGLE_CLOUD_PROJECT environment variable
+  location: "us-central1"  # Or set via GOOGLE_CLOUD_LOCATION
+  
+  # Default settings for all generation
+  defaults:
+    aspect_ratio: "1:1"
+    quality: "standard"  # For Imagen 4: fast/standard/ultra
+    safety_filter_level: "block_some"
+    person_generation: "allow_adult"
+    add_watermark: false  # Only supported by Imagen 3
+  
+  # Category-specific overrides
+  categories:
+    background:
+      aspect_ratio: "16:9"
+      quality: "standard"  # For Imagen 4: fast/standard/ultra
+      safety_filter_level: "block_some"
+      person_generation: "allow_adult"
+      add_watermark: false
+    
+    character:
+      aspect_ratio: "3:4"
+      quality: "standard"  # For Imagen 4: fast/standard/ultra
+      safety_filter_level: "block_some"
+      person_generation: "allow_adult"
+      add_watermark: false
+  
+  # Model-specific capabilities and limits
+  models:
+    "imagen-3.0-generate-002":
+      max_images: 8
+      rpm_limit: 50
+      supports_watermark: true
+      supports_seed: true
+    
+    "imagen-4.0-generate-preview-06-06":
+      max_images: 4
+      rpm_limit: 20
+      supports_watermark: false
+      supports_seed: false
+    
+    "imagen-4.0-fast-generate-preview-06-06":
+      max_images: 4
+      rpm_limit: 20
+      supports_watermark: false
+      supports_seed: false
+    
+    "imagen-4.0-ultra-generate-preview-06-06":
+      max_images: 4
+      rpm_limit: 20
+      supports_watermark: false
+      supports_seed: false
