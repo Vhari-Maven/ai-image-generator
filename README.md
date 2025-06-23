@@ -227,10 +227,85 @@ gcloud auth application-default print-access-token
 - **"API key not found"**: Check `.env` file exists and has correct format
 - **"Authentication failed"**: Re-run authentication commands
 
-## License
-
-[Your License Here]
-
 ## Contributing
 
-[Contributing Guidelines Here]
+We welcome contributions to the AI Art Generator! Here's how you can help:
+
+### Getting Started
+
+1. **Fork the repository** on GitHub
+2. **Clone your fork** locally:
+   ```bash
+   git clone https://github.com/yourusername/ai-image-generator.git
+   cd ai-image-generator
+   ```
+3. **Install development dependencies**:
+   ```bash
+   uv sync --dev
+   ```
+
+### Development Workflow
+
+1. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **Make your changes** following our coding standards:
+   - Run `uv run black .` to format code
+   - Run `uv run ruff check` to lint
+   - Write tests for new functionality (when test framework is added)
+
+3. **Test your changes**:
+   ```bash
+   # Test the CLI works
+   uv run python art-generator.py --test-connection
+   
+   # Test with dry run
+   uv run python art-generator.py --prompts example-prompts.json --dry-run
+   ```
+
+4. **Commit your changes**:
+   ```bash
+   git add .
+   git commit -m "Add: brief description of your changes"
+   ```
+
+5. **Push and create a Pull Request**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+### Contribution Types
+
+- **Bug fixes**: Report issues and submit fixes
+- **New AI services**: Add support for additional image generation APIs
+- **Features**: Enhance existing functionality or add new capabilities
+- **Documentation**: Improve README, add examples, or write guides
+- **Testing**: Add unit tests and integration tests
+
+### Code Style
+
+- Follow PEP 8 guidelines
+- Use Black for code formatting
+- Use Ruff for linting
+- Add type hints where appropriate
+- Write descriptive commit messages
+
+### Adding New AI Services
+
+To add support for a new AI image generation service:
+
+1. Create a new generator in `generators/new_service.py`
+2. Inherit from `BaseGenerator`
+3. Implement required methods: `generate_image()`, `_get_api_parameters()`
+4. Add service option to CLI argument parser
+5. Update configuration examples and documentation
+
+### Questions?
+
+Feel free to open an issue for questions, suggestions, or discussions about potential contributions.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

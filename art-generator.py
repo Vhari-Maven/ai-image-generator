@@ -47,8 +47,11 @@ Examples:
   # Generate only one specific image by ID
   python art-generator.py --prompts example-prompts.json --image-id bg-mystical-forest
   
-  # Generate multiple specific images by ID
+  # Generate multiple specific images by ID (multiple flags)
   python art-generator.py --prompts example-prompts.json --image-id bg-mystical-forest --image-id char-wise-sage
+  
+  # Generate multiple specific images by ID (comma-separated)
+  python art-generator.py --prompts example-prompts.json --image-id bg-mystical-forest,char-wise-sage
   
   # Generate with specific aspect ratio override
   python art-generator.py --prompts example-prompts.json --aspect-ratio 16:9
@@ -94,7 +97,7 @@ Examples:
     parser.add_argument(
         '--image-id',
         action='append',
-        help='Generate only images with these specific IDs (can be used multiple times, e.g., --image-id akira --image-id mystical-study)'
+        help='Generate only images with these specific IDs (can be used multiple times or comma-separated, e.g., --image-id id1,id2,id3 or --image-id id1 --image-id id2)'
     )
     
     # Image generation options
@@ -242,6 +245,14 @@ Examples:
     if not all_prompts:
         print(f"No prompts found in '{args.prompts}'")
         sys.exit(1)
+    
+    # Process comma-separated image IDs
+    if args.image_id:
+        # Expand comma-separated values: ['id1,id2', 'id3'] -> ['id1', 'id2', 'id3']
+        expanded_ids = []
+        for id_group in args.image_id:
+            expanded_ids.extend([id.strip() for id in id_group.split(',')])
+        args.image_id = expanded_ids
     
     # Filter prompts by image ID first (most specific)
     if args.image_id:

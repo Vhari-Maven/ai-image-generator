@@ -42,6 +42,16 @@ uv run python art-generator.py --prompts prompts.json --service vertex
 
 # Dry run to test configuration
 uv run python art-generator.py --prompts prompts.json --dry-run
+
+# Generate specific images by ID (multiple ways)
+uv run python art-generator.py --prompts prompts.json --image-id bg-mystical-forest --image-id char-wise-sage
+uv run python art-generator.py --prompts prompts.json --image-id bg-mystical-forest,char-wise-sage,char-crystal-mage
+
+# Generate all backgrounds with custom aspect ratio
+uv run python art-generator.py --prompts prompts.json --type background --aspect-ratio 16:9
+
+# Generate with multiple images per prompt
+uv run python art-generator.py --prompts prompts.json --images-per-prompt 3
 ```
 
 ## Architecture
