@@ -14,9 +14,8 @@ A Python CLI tool for generating visual assets using multiple AI image generatio
 ## Gallery
 
 <p align="center">
-  <img src="assets/examples/char-kael-advanced.png" alt="Kael the Guardian - Generated Character" width="280">
-  <img src="assets/examples/char-elara-advanced.png" alt="Elara the Forest Spirit - Generated Character" width="280">
-  <img src="assets/examples/char-shadow-lord-advanced.png" alt="Shadow Lord - Generated Character" width="280">
+  <img src="assets/examples/char-kael-advanced.png" alt="Kael the Guardian - Generated Character" width="350">
+  <img src="assets/examples/char-elara-advanced.png" alt="Elara the Forest Spirit - Generated Character" width="350">
 </p>
 
 <p align="center">
