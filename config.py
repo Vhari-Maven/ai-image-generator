@@ -73,18 +73,54 @@ class Config:
                 'defaults': {
                     'aspect_ratio': '1:1',
                     'safety_filter_level': 'BLOCK_LOW_AND_ABOVE',
-                    'person_generation': 'ALLOW_ADULT'
+                    'person_generation': 'ALLOW_ADULT',
+                    'image_size': None  # For Imagen 4: "1K" or "2K"
                 },
                 'categories': {
                     'background': {
                         'aspect_ratio': '16:9',
                         'safety_filter_level': 'BLOCK_LOW_AND_ABOVE',
-                        'person_generation': 'ALLOW_ADULT'
+                        'person_generation': 'ALLOW_ADULT',
+                        'image_size': None
                     },
                     'character': {
                         'aspect_ratio': '3:4',
                         'safety_filter_level': 'BLOCK_LOW_AND_ABOVE',
-                        'person_generation': 'ALLOW_ADULT'
+                        'person_generation': 'ALLOW_ADULT',
+                        'image_size': None
+                    }
+                },
+                # Available models with their capabilities
+                'models': {
+                    'imagen-3.0-generate-002': {
+                        'family': 'imagen-3',
+                        'max_images': 8,
+                        'rpm_limit': 50,
+                        'max_resolution': '1024x1024'
+                    },
+                    'imagen-4.0-generate-001': {
+                        'family': 'imagen-4',
+                        'max_images': 4,
+                        'rpm_limit': 20,
+                        'max_resolution': '2048x2048'
+                    },
+                    'imagen-4.0-fast-generate-001': {
+                        'family': 'imagen-4',
+                        'max_images': 4,
+                        'rpm_limit': 20,
+                        'max_resolution': '2048x2048'
+                    },
+                    'imagen-4.0-ultra-generate-001': {
+                        'family': 'imagen-4',
+                        'max_images': 4,
+                        'rpm_limit': 20,
+                        'max_resolution': '2048x2048'
+                    },
+                    'gemini-2.5-flash-image': {
+                        'family': 'gemini',
+                        'max_images': 1,
+                        'rpm_limit': 20,
+                        'max_resolution': '2048x2048'
                     }
                 }
             },
@@ -105,48 +141,6 @@ class Config:
                         'size': '1024x1536',
                         'quality': 'high',
                         'style': 'vivid'
-                    }
-                }
-            },
-            'vertex': {
-                'model': 'imagen-3.0-generate-002',
-                'project_id': None,
-                'location': 'us-central1',
-                'defaults': {
-                    'aspect_ratio': '1:1',
-                    'quality': 'standard',
-                    'safety_filter_level': 'block_some',
-                    'person_generation': 'allow_adult',
-                    'add_watermark': False
-                },
-                'categories': {
-                    'background': {
-                        'aspect_ratio': '16:9',
-                        'quality': 'standard',
-                        'safety_filter_level': 'block_some',
-                        'person_generation': 'allow_adult',
-                        'add_watermark': False
-                    },
-                    'character': {
-                        'aspect_ratio': '3:4',
-                        'quality': 'standard',
-                        'safety_filter_level': 'block_some',
-                        'person_generation': 'allow_adult',
-                        'add_watermark': False
-                    }
-                },
-                'models': {
-                    'imagen-3.0-generate-002': {
-                        'max_images': 8,
-                        'rpm_limit': 50,
-                        'supports_watermark': True,
-                        'supports_seed': True
-                    },
-                    'imagen-4.0-generate-preview-06-06': {
-                        'max_images': 4,
-                        'rpm_limit': 20,
-                        'supports_watermark': False,
-                        'supports_seed': False
                     }
                 }
             }
@@ -184,29 +178,19 @@ class Config:
             env_key = os.getenv('GOOGLE_AI_API_KEY')
             if env_key:
                 return env_key
-            
+
             # Fall back to config file
             return self.get('api.google_ai_key')
-        
+
         elif service == 'openai' or service == 'gpt4o':
             # Check environment variable first
             env_key = os.getenv('OPENAI_API_KEY')
             if env_key:
                 return env_key
-            
+
             # Fall back to config file
             return self.get('api.openai_key')
-        
-        elif service == 'vertex':
-            # Vertex AI uses Application Default Credentials
-            # Return project ID instead of API key
-            project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
-            if project_id:
-                return project_id
-            
-            # Fall back to config file
-            return self.get('vertex.project_id')
-        
+
         return None
     
     def get_generation_config(self) -> Dict[str, Any]:
@@ -233,24 +217,12 @@ class Config:
         """Get OpenAI configuration with category-specific overrides."""
         # Start with defaults
         config = self.get('openai.defaults', {}).copy()
-        
+
         # Apply category-specific overrides if provided
         if category:
             category_config = self.get(f'openai.categories.{category}', {})
             config.update(category_config)
-        
-        return config
-    
-    def get_vertex_config(self, category: Optional[str] = None) -> Dict[str, Any]:
-        """Get Vertex AI configuration with category-specific overrides."""
-        # Start with defaults
-        config = self.get('vertex.defaults', {}).copy()
-        
-        # Apply category-specific overrides if provided
-        if category:
-            category_config = self.get(f'vertex.categories.{category}', {})
-            config.update(category_config)
-        
+
         return config
 
 
@@ -269,17 +241,20 @@ def get_config(config_path: Optional[str] = None) -> Config:
 def main():
     """Test the configuration system."""
     config = get_config()
-    
+
     print("Configuration loaded:")
     print(f"  Default service: {config.get('generation.default_service')}")
     print(f"  Images per prompt: {config.get('generation.images_per_prompt')}")
     print(f"  Google AI key configured: {'Yes' if config.get_api_key('genai') else 'No'}")
     print(f"  OpenAI key configured: {'Yes' if config.get_api_key('openai') else 'No'}")
-    print(f"  Vertex AI project configured: {'Yes' if config.get_api_key('vertex') else 'No'}")
     print(f"  GenAI model: {config.get('genai.model')}")
     print(f"  OpenAI model: {config.get('openai.model')}")
-    print(f"  Vertex AI model: {config.get('vertex.model')}")
-    print(f"  Vertex AI location: {config.get('vertex.location')}")
+
+    # List available GenAI models
+    print("\nAvailable GenAI models:")
+    models = config.get('genai.models', {})
+    for model_name, model_info in models.items():
+        print(f"  - {model_name} ({model_info.get('family', 'unknown')})")
 
 
 if __name__ == "__main__":
