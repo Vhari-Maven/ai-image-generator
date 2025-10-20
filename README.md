@@ -1,13 +1,14 @@
 # AI Art Generator
 
-A Python CLI tool for generating visual assets using multiple AI image generation services including Google GenAI (Imagen), Google Vertex AI (Imagen 3/4), and OpenAI GPT-4o.
+A Python CLI tool for generating visual assets using AI image generation services including Google GenAI (Imagen 3, Imagen 4, Gemini 2.5 Flash Image) and OpenAI GPT-4o.
 
 ## Features
 
-- **Multiple AI Services**: Support for Google GenAI, Google Vertex AI (Imagen 3/4), and OpenAI GPT-4o
+- **Multiple AI Services**: Support for Google GenAI (Imagen 3/4, Gemini 2.5) and OpenAI GPT-4o
+- **Latest Models**: Imagen 4 with 2K resolution, Gemini 2.5 Flash Image multimodal capabilities
 - **Batch Generation**: Concurrent processing with intelligent rate limiting
 - **Flexible Configuration**: YAML-based configuration with service-specific settings
-- **Advanced Parameters**: Aspect ratio, quality, safety filters, and more
+- **Advanced Parameters**: Aspect ratio, image size, safety filters, and more
 - **Structured Prompts**: JSON-based prompt management with metadata
 - **Progress Tracking**: Real-time progress bars and detailed reporting
 
@@ -48,26 +49,26 @@ uv sync
    # Edit .env with your API keys
    ```
 
-3. **For Google Vertex AI (optional):**
-   ```bash
-   # Install Google Cloud CLI and authenticate
-   gcloud auth application-default login
-   ```
-
 ### Basic Usage
 
 ```bash
 # Test connection
 uv run python art-generator.py --test-connection
 
-# Generate from a prompt file
+# Generate from a prompt file (uses Imagen 3 by default)
 uv run python art-generator.py --prompts my-prompts.json
+
+# Generate with Imagen 4 Ultra (2K resolution)
+uv run python art-generator.py --prompts my-prompts.json --model imagen-4.0-ultra-generate-001 --image-size 2K
+
+# Generate with Gemini 2.5 Flash Image
+uv run python art-generator.py --prompts my-prompts.json --model gemini-2.5-flash-image
 
 # Generate specific images
 uv run python art-generator.py --prompts my-prompts.json --image-id background-1
 
-# Use different service
-uv run python art-generator.py --prompts my-prompts.json --service vertex
+# Use OpenAI GPT-4o
+uv run python art-generator.py --prompts my-prompts.json --service gpt4o
 ```
 
 ## Prompt File Format
@@ -97,36 +98,36 @@ Create a JSON file with your prompts:
 }
 ```
 
-## Services
+## Available Services & Models
 
-### Google GenAI (Imagen)
+### Google GenAI (Default)
 
+**Available Models:**
+- **Imagen 3** (`imagen-3.0-generate-002`) - Default, up to 1024x1024, 50 RPM
+- **Imagen 4** (`imagen-4.0-generate-001`) - Standard quality, up to 2K resolution, 20 RPM, $0.04/image
+- **Imagen 4 Fast** (`imagen-4.0-fast-generate-001`) - Faster generation, 20 RPM, $0.04/image
+- **Imagen 4 Ultra** (`imagen-4.0-ultra-generate-001`) - Highest quality, 20 RPM, $0.06/image
+- **Gemini 2.5 Flash Image** (`gemini-2.5-flash-image`) - Multimodal, 10 aspect ratios, 20 RPM, $0.039/image
+
+**Setup:**
 ```bash
 # Set API key in .env
 GOOGLE_AI_API_KEY="your-api-key"
 
-# Generate images
-uv run python art-generator.py --prompts prompts.json --service genai
-```
+# Use default Imagen 3
+uv run python art-generator.py --prompts prompts.json
 
-### Google Vertex AI (Imagen 3/4)
+# Use Imagen 4 with 2K resolution
+uv run python art-generator.py --prompts prompts.json --model imagen-4.0-generate-001 --image-size 2K
 
-```bash
-# Set project ID in .env
-GOOGLE_CLOUD_PROJECT="your-project-id"
-GOOGLE_CLOUD_LOCATION="us-central1"
-
-# Authenticate (one-time setup)
-gcloud auth application-default login
-
-# Generate with Imagen 4
-uv run python art-generator.py --prompts prompts.json --service vertex --model imagen-4.0-generate-preview-06-06
+# Use Gemini 2.5 Flash Image
+uv run python art-generator.py --prompts prompts.json --model gemini-2.5-flash-image
 ```
 
 ### OpenAI GPT-4o
 
 ```bash
-# Set API key in .env  
+# Set API key in .env
 OPENAI_API_KEY="your-api-key"
 
 # Generate images
@@ -144,8 +145,11 @@ uv run python art-generator.py --prompts prompts.json --type backgrounds --aspec
 # Generate multiple variations per prompt
 uv run python art-generator.py --prompts prompts.json --images-per-prompt 3
 
-# Custom quality settings
-uv run python art-generator.py --prompts prompts.json --service vertex --quality ultra
+# Use Imagen 4 Ultra for highest quality
+uv run python art-generator.py --prompts prompts.json --model imagen-4.0-ultra-generate-001 --image-size 2K
+
+# Generate specific images by ID
+uv run python art-generator.py --prompts prompts.json --image-id bg-forest,char-wizard
 
 # Custom output directory
 uv run python art-generator.py --prompts prompts.json --output-dir ./my-images
@@ -165,19 +169,27 @@ The `config.yaml` file allows you to set defaults for each service:
 
 ```yaml
 generation:
-  default_service: "vertex"
+  default_service: "genai"
   images_per_prompt: 1
 
-vertex:
-  model: "imagen-4.0-generate-preview-06-06"
+genai:
+  # Choose your default model
+  model: "imagen-3.0-generate-002"  # or imagen-4.0-generate-001, gemini-2.5-flash-image
+
   defaults:
     aspect_ratio: "1:1"
-    quality: "standard"
+    safety_filter_level: "BLOCK_LOW_AND_ABOVE"
+    person_generation: "ALLOW_ADULT"
+    image_size: null  # For Imagen 4: "1K" or "2K"
+
+  # Category-specific overrides
   categories:
     background:
       aspect_ratio: "16:9"
+      image_size: "2K"  # Use 2K for backgrounds with Imagen 4
     character:
       aspect_ratio: "3:4"
+      image_size: "2K"  # Use 2K for characters with Imagen 4
 ```
 
 ## Development
@@ -209,28 +221,34 @@ uv run pytest
 
 The tool automatically handles rate limiting for each service:
 
-- **Google GenAI**: 8 concurrent threads (50 RPM)
-- **Google Vertex AI Imagen 3**: 6 concurrent threads (50 RPM)  
-- **Google Vertex AI Imagen 4**: 4 concurrent threads (20 RPM)
+- **Imagen 3** (`imagen-3.0-generate-002`): 8 concurrent threads, 50 RPM
+- **Imagen 4 models** (`imagen-4.0-*`): 4 concurrent threads, 20 RPM
+- **Gemini 2.5 Flash Image**: 4 concurrent threads, 20 RPM
 - **OpenAI GPT-4o**: 5 concurrent threads (varies by tier)
+
+**Model Comparison:**
+
+| Model | Max Resolution | RPM Limit | Concurrent Threads | Cost per Image |
+|-------|----------------|-----------|-------------------|----------------|
+| Imagen 3 | 1024x1024 | 50 | 8 | - |
+| Imagen 4 Standard | 2048x2048 | 20 | 4 | $0.04 |
+| Imagen 4 Fast | 2048x2048 | 20 | 4 | $0.04 |
+| Imagen 4 Ultra | 2048x2048 | 20 | 4 | $0.06 |
+| Gemini 2.5 Flash | 2048x2048 | 20 | 4 | $0.039 |
 
 ## Troubleshooting
 
 ### Authentication Issues
 
-**Google Vertex AI:**
-```bash
-# Re-authenticate
-gcloud auth application-default login
-
-# Verify project access
-gcloud auth application-default print-access-token
-```
-
 **API Key Issues:**
-- Verify `.env` file format
-- Check API key permissions
-- Test connection: `--test-connection`
+- Verify `.env` file format (should contain `GOOGLE_AI_API_KEY="your-key"`)
+- Check API key permissions at [Google AI Studio](https://aistudio.google.com/app/apikey)
+- Test connection: `uv run python art-generator.py --test-connection`
+
+**Model Selection:**
+- Ensure you have access to the model you're trying to use
+- Some models (Imagen 4, Gemini 2.5) may require preview access
+- Check pricing and quota limits for your Google AI account
 
 ### Common Errors
 

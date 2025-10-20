@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an AI Art Generator - a Python CLI tool for generating visual assets using multiple AI image generation services including Google GenAI (Imagen), Google Vertex AI (Imagen 3/4), and OpenAI GPT-4o. The tool supports batch generation, flexible configuration, and structured prompt management.
+This is an AI Art Generator - a Python CLI tool for generating visual assets using Google GenAI (Imagen 3, Imagen 4, Gemini 2.5 Flash Image) and OpenAI GPT-4o. The tool supports batch generation, flexible configuration, and structured prompt management with the latest AI models.
 
 ## Development Commands
 
@@ -34,11 +34,17 @@ uv run pytest
 # Test connection to services
 uv run python art-generator.py --test-connection
 
-# Generate from prompt file
+# Generate from prompt file (uses Imagen 3 by default)
 uv run python art-generator.py --prompts example-prompts.json
 
-# Generate with specific service
-uv run python art-generator.py --prompts prompts.json --service vertex
+# Generate with Imagen 4 Ultra at 2K resolution
+uv run python art-generator.py --prompts prompts.json --model imagen-4.0-ultra-generate-001 --image-size 2K
+
+# Generate with Gemini 2.5 Flash Image
+uv run python art-generator.py --prompts prompts.json --model gemini-2.5-flash-image
+
+# Generate with specific service (OpenAI)
+uv run python art-generator.py --prompts prompts.json --service gpt4o
 
 # Dry run to test configuration
 uv run python art-generator.py --prompts prompts.json --dry-run
@@ -65,6 +71,8 @@ uv run python art-generator.py --prompts prompts.json --images-per-prompt 3
 **Generator Architecture**: Plugin-based system with a base class pattern:
 - `BaseGenerator`: Provides shared functionality for image saving, backup handling, and metadata embedding
 - Service-specific generators inherit from BaseGenerator and implement their API integrations
+- `GoogleGenAIGenerator`: Supports Imagen 3, Imagen 4 (all variants), and Gemini 2.5 Flash Image
+- `OpenAIGPT4oGenerator`: Supports OpenAI's GPT-4o image generation
 - Located in `generators/` directory
 
 **Prompt Management (`prompts/prompt_parser.py`)**: Handles parsing of JSON prompt files and creates structured `ArtPrompt` objects with metadata.
@@ -73,7 +81,7 @@ uv run python art-generator.py --prompts prompts.json --images-per-prompt 3
 
 **ArtPrompt**: Standardized data structure containing prompt text, metadata, category, and output configuration.
 
-**Service Generators**: Each AI service (GenAI, Vertex AI, OpenAI) has its own generator class implementing service-specific parameters while sharing common functionality through BaseGenerator.
+**Service Generators**: Each AI service (GenAI, OpenAI) has its own generator class implementing service-specific parameters while sharing common functionality through BaseGenerator.
 
 **Configuration Hierarchy**: Settings cascade from defaults → config file → environment variables → CLI arguments, with category-specific overrides supported for each service.
 
@@ -93,9 +101,15 @@ cp config.yaml.example config.yaml
 ```
 
 ### Service Configuration
-- **Google GenAI**: Requires `GOOGLE_AI_API_KEY`
-- **Google Vertex AI**: Requires `GOOGLE_CLOUD_PROJECT` + `gcloud auth application-default login`
+- **Google GenAI**: Requires `GOOGLE_AI_API_KEY` (supports Imagen 3/4 and Gemini 2.5)
 - **OpenAI GPT-4o**: Requires `OPENAI_API_KEY`
+
+### Available Google GenAI Models
+- `imagen-3.0-generate-002`: Default, up to 1024x1024, 50 RPM
+- `imagen-4.0-generate-001`: Standard quality, up to 2K, 20 RPM, $0.04/image
+- `imagen-4.0-fast-generate-001`: Faster generation, up to 2K, 20 RPM, $0.04/image
+- `imagen-4.0-ultra-generate-001`: Highest quality, up to 2K, 20 RPM, $0.06/image
+- `gemini-2.5-flash-image`: Multimodal, 10 aspect ratios, 20 RPM, $0.039/image
 
 ## Prompt File Format
 
@@ -125,6 +139,12 @@ The tool uses JSON files with this structure:
 
 ## Service-Specific Notes
 
-- **Rate Limiting**: Each service has different rate limits and concurrent thread counts configured in the system
-- **Model Support**: Vertex AI supports multiple Imagen models with different capabilities (3.0, 4.0 variants)
+- **Rate Limiting**: Each model has different rate limits and concurrent thread counts:
+  - Imagen 3: 8 threads, 50 RPM
+  - Imagen 4 models: 4 threads, 20 RPM
+  - Gemini 2.5 Flash: 4 threads, 20 RPM
+- **Model Support**: GoogleGenAIGenerator supports multiple models with different capabilities
+  - Imagen 3/4: aspect_ratio, safety_filter_level, person_generation
+  - Imagen 4 only: image_size ("1K" or "2K")
+  - Gemini: aspect_ratio (10 different ratios supported)
 - **Parameter Mapping**: Each service uses different parameter names - the generators handle translation from common interface

@@ -26,103 +26,87 @@ output:
 
 # Google GenAI Specific Settings
 genai:
+  # Model to use - options:
+  #   Imagen 3: imagen-3.0-generate-002
+  #   Imagen 4: imagen-4.0-generate-001, imagen-4.0-fast-generate-001, imagen-4.0-ultra-generate-001
+  #   Gemini:   gemini-2.5-flash-image
   model: "imagen-3.0-generate-002"
-  
+
   # Default settings for all generation
   defaults:
     aspect_ratio: "1:1"
     safety_filter_level: "BLOCK_LOW_AND_ABOVE"
     person_generation: "ALLOW_ADULT"
-  
+    image_size: null  # For Imagen 4 only: "1K" or "2K" (null = default)
+
   # Category-specific overrides
   categories:
     background:
       aspect_ratio: "16:9"
       safety_filter_level: "BLOCK_LOW_AND_ABOVE"
       person_generation: "ALLOW_ADULT"
-    
+      image_size: null  # For Imagen 4: can use "2K" for higher resolution
+
     character:
-      aspect_ratio: "3:4" 
+      aspect_ratio: "3:4"
       safety_filter_level: "BLOCK_LOW_AND_ABOVE"
       person_generation: "ALLOW_ADULT"
+      image_size: null
+
+  # Available models and their capabilities (informational)
+  models:
+    "imagen-3.0-generate-002":
+      family: "imagen-3"
+      max_images: 8
+      rpm_limit: 50
+      max_resolution: "1024x1024"
+
+    "imagen-4.0-generate-001":
+      family: "imagen-4"
+      max_images: 4
+      rpm_limit: 20
+      max_resolution: "2048x2048"
+      cost_per_image: "$0.04"
+
+    "imagen-4.0-fast-generate-001":
+      family: "imagen-4"
+      max_images: 4
+      rpm_limit: 20
+      max_resolution: "2048x2048"
+      cost_per_image: "$0.04"
+
+    "imagen-4.0-ultra-generate-001":
+      family: "imagen-4"
+      max_images: 4
+      rpm_limit: 20
+      max_resolution: "2048x2048"
+      cost_per_image: "$0.06"
+
+    "gemini-2.5-flash-image":
+      family: "gemini"
+      max_images: 1
+      rpm_limit: 20
+      max_resolution: "2048x2048"
+      cost_per_image: "$0.039"
 
 # OpenAI GPT-4o Specific Settings
 openai:
   model: "gpt-image-1"
-  
+
   # Default settings for all generation
   defaults:
     size: "1024x1024"
     quality: "standard"
     style: "natural"
-  
+
   # Category-specific overrides
   categories:
     background:
       size: "1536x1024"  # Landscape format for backgrounds
       quality: "standard"
       style: "natural"
-    
+
     character:
       size: "1024x1536"  # Portrait format for characters
       quality: "standard"
       style: "vivid"  # More vibrant for character portraits
-
-# Google Vertex AI Specific Settings (supports Imagen 3 and Imagen 4)
-vertex:
-  # Default model (can be overridden via CLI)
-  model: "imagen-4.0-generate-preview-06-06"
-  
-  # Google Cloud Project configuration
-  project_id: null  # Set via GOOGLE_CLOUD_PROJECT environment variable
-  location: "us-central1"  # Or set via GOOGLE_CLOUD_LOCATION
-  
-  # Default settings for all generation
-  defaults:
-    aspect_ratio: "1:1"
-    quality: "standard"  # For Imagen 4: fast/standard/ultra
-    safety_filter_level: "block_some"
-    person_generation: "allow_adult"
-    add_watermark: false  # Only supported by Imagen 3
-  
-  # Category-specific overrides
-  categories:
-    background:
-      aspect_ratio: "16:9"
-      quality: "standard"  # For Imagen 4: fast/standard/ultra
-      safety_filter_level: "block_some"
-      person_generation: "allow_adult"
-      add_watermark: false
-    
-    character:
-      aspect_ratio: "3:4"
-      quality: "standard"  # For Imagen 4: fast/standard/ultra
-      safety_filter_level: "block_some"
-      person_generation: "allow_adult"
-      add_watermark: false
-  
-  # Model-specific capabilities and limits
-  models:
-    "imagen-3.0-generate-002":
-      max_images: 8
-      rpm_limit: 50
-      supports_watermark: true
-      supports_seed: true
-    
-    "imagen-4.0-generate-preview-06-06":
-      max_images: 4
-      rpm_limit: 20
-      supports_watermark: false
-      supports_seed: false
-    
-    "imagen-4.0-fast-generate-preview-06-06":
-      max_images: 4
-      rpm_limit: 20
-      supports_watermark: false
-      supports_seed: false
-    
-    "imagen-4.0-ultra-generate-preview-06-06":
-      max_images: 4
-      rpm_limit: 20
-      supports_watermark: false
-      supports_seed: false

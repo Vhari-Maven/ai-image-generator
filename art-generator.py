@@ -24,7 +24,6 @@ sys.path.insert(0, str(current_dir))
 
 from prompts.prompt_parser import PromptParser, ArtPrompt
 from generators.google_genai import GoogleGenAIGenerator
-from generators.google_vertex import GoogleVertexGenerator
 from generators.openai_gpt4o import OpenAIGPT4oGenerator
 
 
@@ -35,45 +34,39 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Generate from a prompt file
+  # Generate from a prompt file (default: Imagen 3)
   python art-generator.py --prompts example-prompts.json
-  
+
   # Generate only backgrounds
   python art-generator.py --prompts example-prompts.json --type backgrounds
-  
+
+  # Generate with Imagen 4 (ultra quality)
+  python art-generator.py --prompts example-prompts.json --model imagen-4.0-ultra-generate-001
+
+  # Generate with Gemini 2.5 Flash Image
+  python art-generator.py --prompts example-prompts.json --model gemini-2.5-flash-image
+
+  # Generate with Imagen 4 at 2K resolution
+  python art-generator.py --prompts example-prompts.json --model imagen-4.0-generate-001 --image-size 2K
+
   # Generate with multiple images per prompt
   python art-generator.py --prompts example-prompts.json --images-per-prompt 3
-  
+
   # Generate only one specific image by ID
   python art-generator.py --prompts example-prompts.json --image-id bg-mystical-forest
-  
-  # Generate multiple specific images by ID (multiple flags)
-  python art-generator.py --prompts example-prompts.json --image-id bg-mystical-forest --image-id char-wise-sage
-  
+
   # Generate multiple specific images by ID (comma-separated)
   python art-generator.py --prompts example-prompts.json --image-id bg-mystical-forest,char-wise-sage
-  
+
   # Generate with specific aspect ratio override
   python art-generator.py --prompts example-prompts.json --aspect-ratio 16:9
-  
-  # Generate characters with portrait aspect ratio
-  python art-generator.py --prompts example-prompts.json --type characters --aspect-ratio 3:4
-  
+
   # Test connection to Google GenAI
   python art-generator.py --test-connection
-  
-  # Generate using Google Vertex AI (requires project setup)
-  python art-generator.py --prompts example-prompts.json --service vertex --project-id my-project-123
-  
-  # Generate with Vertex AI using specific location and model
-  python art-generator.py --prompts example-prompts.json --service vertex --project-id my-project-123 --location us-west1 --model imagen-4.0-generate-preview-06-06
-  
-  # Test Vertex AI connection
-  python art-generator.py --test-connection --service vertex --project-id my-project-123
-  
-  # Generate backgrounds with Vertex AI using environment variables
-  python art-generator.py --prompts example-prompts.json --service vertex --type backgrounds
-  
+
+  # Generate using OpenAI GPT-4o
+  python art-generator.py --prompts example-prompts.json --service gpt4o
+
   # Custom output directory
   python art-generator.py --prompts example-prompts.json --output-dir ./my-images
         """
@@ -122,8 +115,8 @@ Examples:
     
     parser.add_argument(
         '--quality',
-        choices=['low', 'medium', 'high', 'fast', 'standard', 'ultra'],
-        help='Override image quality (GPT-4o: low/medium/high, Vertex: fast/standard/ultra, default: varies by service)'
+        choices=['low', 'medium', 'high'],
+        help='Override image quality (GPT-4o only: low/medium/high, default: varies by service)'
     )
     
     parser.add_argument(
@@ -147,32 +140,34 @@ Examples:
     # Service selection
     parser.add_argument(
         '--service',
-        choices=['genai', 'gpt4o', 'vertex'],
+        choices=['genai', 'gpt4o'],
         default='genai',
-        help='AI service to use (default: genai)'
+        help='AI service to use (default: genai - Google GenAI with Imagen/Gemini models)'
     )
-    
+
     # API key override
     parser.add_argument(
         '--api-key',
         help='API key for the service (overrides environment variable)'
     )
-    
-    # Google Vertex AI specific arguments
-    parser.add_argument(
-        '--project-id',
-        help='Google Cloud Project ID for Vertex AI (if not provided, will use GOOGLE_CLOUD_PROJECT environment variable)'
-    )
-    
-    parser.add_argument(
-        '--location',
-        default='us-central1',
-        help='Google Cloud location for Vertex AI (default: us-central1, can also use GOOGLE_CLOUD_LOCATION environment variable)'
-    )
-    
+
+    # Google GenAI specific arguments
     parser.add_argument(
         '--model',
-        help='Override model name (vertex: imagen-3.0-generate-002, imagen-4.0-generate-preview-06-06)'
+        choices=[
+            'imagen-3.0-generate-002',
+            'imagen-4.0-generate-001',
+            'imagen-4.0-fast-generate-001',
+            'imagen-4.0-ultra-generate-001',
+            'gemini-2.5-flash-image'
+        ],
+        help='GenAI model to use (default: imagen-3.0-generate-002). Imagen 4 models support 2K resolution, Gemini is multimodal.'
+    )
+
+    parser.add_argument(
+        '--image-size',
+        choices=['1K', '2K'],
+        help='Image resolution for Imagen 4 models (default: 1K). Only works with imagen-4.0-* models.'
     )
     
     # Utility commands
@@ -213,7 +208,7 @@ Examples:
     
     # Handle utility commands
     if args.test_connection:
-        test_service_connection(args.service, args.api_key, args.project_id, args.location)
+        test_service_connection(args.service, args.api_key, args.model)
         return
     
     if args.list_prompts:
@@ -289,6 +284,8 @@ Examples:
     # Show what will be generated
     print(f"Prompt file: {args.prompts}")
     print(f"Service: {args.service}")
+    if args.model:
+        print(f"Model: {args.model}")
     if args.image_id:
         print(f"Specific images: {', '.join(args.image_id)}")
     else:
@@ -296,15 +293,12 @@ Examples:
     print(f"Images per prompt: {args.images_per_prompt}")
     if args.aspect_ratio:
         print(f"Aspect ratio override (GenAI): {args.aspect_ratio}")
+    if args.image_size:
+        print(f"Image size (Imagen 4): {args.image_size}")
     if args.size:
         print(f"Size override (GPT-4o): {args.size}")
     if args.quality:
-        if args.service == 'gpt4o':
-            print(f"Quality override (GPT-4o): {args.quality}")
-        elif args.service == 'vertex':
-            print(f"Quality override (Vertex): {args.quality}")
-        else:
-            print(f"Quality override: {args.quality}")
+        print(f"Quality override (GPT-4o): {args.quality}")
     if args.style:
         print(f"Style override (GPT-4o): {args.style}")
     if args.safety_filter:
@@ -326,10 +320,12 @@ Examples:
     try:
         if args.service == 'genai':
             generator = GoogleGenAIGenerator(args.api_key)
+            # Override model if specified
+            if args.model:
+                generator.model_name = args.model
+                print(f"Using model: {args.model}")
         elif args.service == 'gpt4o':
             generator = OpenAIGPT4oGenerator(args.api_key)
-        elif args.service == 'vertex':
-            generator = GoogleVertexGenerator(args.project_id, args.location)
         else:
             print(f"Error: Service '{args.service}' not supported")
             sys.exit(1)
@@ -354,7 +350,8 @@ Examples:
                 prompts, base_output_dir, args.images_per_prompt,
                 aspect_ratio=args.aspect_ratio,
                 safety_filter_level=args.safety_filter,
-                person_generation=args.allow_people
+                person_generation=args.allow_people,
+                image_size=args.image_size
             )
         elif args.service == 'gpt4o':
             results = generator.generate_batch(
@@ -362,15 +359,6 @@ Examples:
                 size=args.size,
                 quality=args.quality,
                 style=args.style
-            )
-        elif args.service == 'vertex':
-            results = generator.generate_batch(
-                prompts, base_output_dir, args.images_per_prompt,
-                model_name=args.model,
-                quality=args.quality,
-                aspect_ratio=args.aspect_ratio,
-                safety_filter_level=args.safety_filter,
-                person_generation=args.allow_people
             )
         else:
             print(f"Error: Service '{args.service}' not supported for generation")
@@ -435,20 +423,20 @@ def list_available_prompts(prompt_parser: PromptParser, prompt_file: str):
         print()
 
 
-def test_service_connection(service: str, api_key: Optional[str] = None, project_id: Optional[str] = None, location: Optional[str] = None):
+def test_service_connection(service: str, api_key: Optional[str] = None, model: Optional[str] = None):
     """Test connection to the specified service."""
     print(f"Testing {service} connection...")
-    
+    if model:
+        print(f"Model: {model}")
+
     if service == 'genai':
         success = GoogleGenAIGenerator.test_connection(api_key)
     elif service == 'gpt4o':
         success = OpenAIGPT4oGenerator.test_connection(api_key)
-    elif service == 'vertex':
-        success = GoogleVertexGenerator.test_connection(project_id, location)
     else:
         print(f"Service '{service}' not supported")
         return
-    
+
     if success:
         print("Connection test passed!")
     else:
