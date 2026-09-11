@@ -96,17 +96,19 @@ Examples:
                      help="Number of images per prompt (default: 1)")
     img.add_argument("--aspect-ratio", choices=GENAI_ASPECT_RATIOS,
                      help="Override aspect ratio (GenAI only)")
-    # Size accepts arbitrary strings: gpt-image-2 supports a wide range
+    # Size accepts arbitrary strings: gpt-image-2+ supports a wide range
     # well beyond the legacy 7-preset list. The .prompts header has always
     # been free-form here; the CLI now matches.
     img.add_argument("--size",
                      help="Override image size for OpenAI (e.g. 1024x1024, "
                           "1536x1024, 1280x960). Accepts any value the model "
-                          "supports — see CLAUDE.md for gpt-image-2 limits.")
-    img.add_argument("--quality", choices=("auto", "low", "medium", "high"),
-                     help="Override image quality (OpenAI only)")
+                          "supports — see CLAUDE.md for gpt-image size limits.")
+    img.add_argument("--quality",
+                     choices=("auto", "low", "medium", "high", "xhigh", "max"),
+                     help="Override image quality (OpenAI only; xhigh/max "
+                          "need a gpt-image-2.5 model)")
     img.add_argument("--style", choices=("natural", "vivid"),
-                     help="Override style (metadata only; not honored by gpt-image-2)")
+                     help="Override style (metadata only; not sent to gpt-image models)")
     img.add_argument("--input-image", action="append", dest="input_image",
                      help="Reference image to feed into the model alongside "
                           "the prompt. Repeatable. When set, overrides any "
@@ -125,7 +127,8 @@ Examples:
                      help="Override model name "
                           "(genai: gemini-3.1-flash-image-preview / "
                           "gemini-3-pro-image-preview / gemini-2.5-flash-image; "
-                          "openai: gpt-image-2 / gpt-image-1.5 / gpt-image-1)")
+                          "openai: gpt-image-2.5-flare / gpt-image-2.5-sunburst / "
+                          "gpt-image-2 / gpt-image-1.5 / gpt-image-1)")
 
     util = parser.add_argument_group("utility")
     util.add_argument("--list-collections", action="store_true",

@@ -49,14 +49,22 @@ genai:
       max_images: 1
       rpm_limit: 50
 
-# OpenAI Image Generation Settings (gpt-image-2)
+# OpenAI Image Generation Settings (gpt-image family)
 openai:
-  model: "gpt-image-2"
+  # Options:
+  #   gpt-image-2.5-flare     (default — fastest, same price as gpt-image-2,
+  #                            native transparency, quality up to max)
+  #   gpt-image-2.5-sunburst  (premium — tighter multi-edit control, slower)
+  #   gpt-image-2             (prior default; NO native transparency)
+  #   gpt-image-1.5 / gpt-image-1 (legacy; native transparency)
+  model: "gpt-image-2.5-flare"
 
   # Defaults when no .prompts header / per-entry override / CLI flag supplies
   # a value.
   defaults:
     size: "1024x1024"
+    # auto | low | medium | high | xhigh | max — xhigh/max are gpt-image-2.5
+    # only and roughly ~1.8x / ~4x the cost of high at the same size.
     quality: "auto"
     style: "natural"
 

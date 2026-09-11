@@ -1,8 +1,8 @@
 # ai-art-generator
 
 A CLI for generating AI art collections from `.prompts` files. Wraps
-OpenAI `gpt-image-2` (and the transparent-background `gpt-image-1.5` /
-`gpt-image-1`) and Google Gemini image models (Nano Banana family)
+OpenAI's gpt-image family (`gpt-image-2.5-flare` / `-sunburst`, `gpt-image-2`,
+`gpt-image-1.5`, `gpt-image-1`) and Google Gemini image models (Nano Banana family)
 behind a single interface.
 
 ## Quick start
@@ -46,10 +46,15 @@ Resolution order: env var → `/run/secrets/<provider>-api-key` → `config.yaml
 - `gemini-2.5-flash-image` — Nano Banana (cheapest)
 
 **OpenAI**:
-- `gpt-image-2` — default; opaque output
-- `gpt-image-1.5` / `gpt-image-1` — native transparent backgrounds
-  (auto-selected when the `.prompts` header sets `remove_background: true`
-  on one of those models — the rembg postprocess is skipped in that case)
+- `gpt-image-2.5-flare` — default; fastest, quality up to `max`, native transparency
+- `gpt-image-2.5-sunburst` — premium; tighter multi-edit control, slower, same price
+- `gpt-image-2` — prior default; no native transparency
+- `gpt-image-1.5` / `gpt-image-1` — legacy; native transparency
+
+Native transparent backgrounds are auto-selected when the `.prompts` header
+sets `remove_background: true` on a model that supports them — the rembg
+postprocess is skipped in that case. On `gpt-image-2` the same flag routes
+through the local chroma-key/rembg pipeline instead.
 
 ## Commands
 

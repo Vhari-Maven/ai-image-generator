@@ -5,14 +5,15 @@ Guidance for Claude Code when working on this tool.
 ## What it is
 
 A generic CLI for generating AI art collections from `.prompts` files,
-wrapping OpenAI's `gpt-image-2` (and `gpt-image-1.5` / `gpt-image-1`
-for native transparent backgrounds) and Google's Gemini image models.
+wrapping OpenAI's gpt-image family (`gpt-image-2.5-flare` /
+`gpt-image-2.5-sunburst`, plus `gpt-image-2`, `gpt-image-1.5`,
+`gpt-image-1`) and Google's Gemini image models.
 Project-agnostic: paths are configurable, terminology is neutral
 (`--collection`, not `--story`/`--artifact`). Currently lives in-tree
 under `tools/ai_art_generator/` but designed for clean extraction to
 its own repo.
 
-## Supported Models (April 2026)
+## Supported Models (September 2026)
 
 **Google GenAI** — all images generated through the Gemini API's
 `generateContent` endpoint (Nano Banana family):
@@ -29,23 +30,42 @@ Notes:
 - All outputs include invisible SynthID watermark
 - Imagen models and the Vertex AI path were removed when Google deprecated them — do not reintroduce without discussion.
 
-**OpenAI** — `gpt-image-2` (released April 2026):
-- Quality: `auto` (default), `low`, `medium`, `high`
-- Strong text rendering across scripts; reasoning-enhanced generation
-- No transparent backgrounds — for those, use `gpt-image-1.5` (see below)
+**OpenAI** — gpt-image family via the Images API (`images.generate` /
+`images.edit`):
 
-**OpenAI transparent-background path** — `gpt-image-1.5` (released Dec 2025) and `gpt-image-1`:
-- Both accept `background: "transparent"` on the Images API; output PNG with alpha.
+| Model ID | Released | Quality tiers | Native transparency | Use case |
+|---|---|---|---|---|
+| `gpt-image-2.5-flare` | 2026-09-08 | auto, low, medium, high, **xhigh, max** | yes | **Default.** ~50% lower latency than gpt-image-2 at the same token price; OpenAI's recommended everyday model |
+| `gpt-image-2.5-sunburst` | 2026-09-08 | same as flare | yes | Premium: tighter control across multi-turn edits, product/campaign polish. Slower. Same token price as flare |
+| `gpt-image-2` | 2026-04 | auto, low, medium, high | **no** | Prior default; keep for reproducing older renders |
+| `gpt-image-1.5` | 2025-12 | auto, low, medium, high | yes | Legacy transparent path (pre-2.5) |
+| `gpt-image-1` | 2025-04 | auto, low, medium, high | yes | Legacy |
+
+Notes on 2.5:
+- Both 2.5 models bill at gpt-image-2's per-token rates (text in $5 /
+  image in $8 / image out $30 per 1M). `xhigh` and `max` are new tiers
+  above `high`; at 1024×1024 OpenAI's calculator puts them at roughly
+  1.8× and 4× the cost of `high`. Passing them to a non-2.5 model is a
+  hard error in `openai_image.py` (`quality_tiers_for`), not a downgrade.
+- `background: "transparent"` is GA on both (PNG/WebP). `opaque` is a
+  new explicit value; the generator still only sends `transparent`.
+- Dated snapshots (`gpt-image-2.5-flare-2026-09-08`) are accepted
+  anywhere the alias is; capability + pricing lookups prefix-match.
+- The Responses API adds `action`, `partial_images` (streaming) and
+  `moderation: "low"`; none are wired here yet.
+
+**OpenAI transparent-background path** — every model except `gpt-image-2`:
 - Wired up via the existing `remove_background:` flag in the `.prompts` file: when
-  the file specifies `model: gpt-image-1.5` (or `gpt-image-1`) AND
-  `remove_background: true`, the OpenAI generator passes `background="transparent"`
-  + `output_format="png"` natively, then **skips** the local rembg postprocess
-  (the PNG is already alpha-transparent, no `-cutout.png` is written).
+  the model supports native transparency AND `remove_background: true`,
+  the OpenAI generator passes `background="transparent"` + `output_format="png"`
+  natively, then **skips** the local rembg postprocess (the PNG is already
+  alpha-transparent, no `-cutout.png` is written).
 - For `gpt-image-2`, `remove_background: true` still routes through the rembg
   postprocess as before (writes a `-cutout.png` next to the opaque source).
 - Non-bool `remove_background:` values (e.g. `remove_background: birefnet-portrait`)
   are explicit rembg-model overrides and always go through the postprocess path,
-  even on transparent-capable models.
+  even on transparent-capable models. Use this when you want the chroma-key
+  pipeline's edge handling over the API's alpha.
 
 Sizes — far more flexible than commonly assumed:
 
@@ -64,7 +84,10 @@ Sizes — far more flexible than commonly assumed:
 Both the `--size` CLI flag and the `.prompts` `size:` field accept any
 free-form value the model supports — there is no preset whitelist.
 
-Source: <https://developers.openai.com/api/docs/models/gpt-image-2>
+Sources: <https://developers.openai.com/api/docs/models/gpt-image-2.5-flare>,
+<https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst>,
+<https://developers.openai.com/api/docs/guides/image-generation>,
+<https://developers.openai.com/api/docs/pricing>
 
 ## Environment Setup
 
@@ -148,9 +171,14 @@ uv run --project tools/ai_art_generator art-generator \
 uv run --project tools/ai_art_generator art-generator \
   --collection my-set --image-id base --model gemini-3-pro-image-preview
 
-# OpenAI gpt-image-2
+# OpenAI (default gpt-image-2.5-flare)
 uv run --project tools/ai_art_generator art-generator \
   --collection my-set --image-id base --service openai --quality high
+
+# OpenAI premium tier
+uv run --project tools/ai_art_generator art-generator \
+  --collection my-set --image-id base --service openai \
+  --model gpt-image-2.5-sunburst --quality xhigh
 ```
 
 **Batch:**
@@ -262,7 +290,7 @@ tools/ai_art_generator/
 │   ├── base_generator.py    # Batch threading, save/metadata, post-process hook,
 │   │                        # parameter resolution, cost lookup
 │   ├── google_genai.py      # Gemini generateContent (Nano Banana family)
-│   └── openai_image.py      # OpenAI gpt-image-2 / gpt-image-1.5 / gpt-image-1
+│   └── openai_image.py      # OpenAI gpt-image-2.5 / 2 / 1.5 / 1
 ├── postprocess/
 │   ├── __init__.py          # Stage registry — register new stages here
 │   ├── pipeline.py          # PostprocessStage protocol + run_pipeline driver
@@ -400,7 +428,7 @@ import as `from google import genai`.
 ## Performance & Threading
 
 - Google GenAI: up to 8 concurrent threads (within the 50 RPM default quota)
-- OpenAI gpt-image-2: up to 5 concurrent threads (Tier 1: 5 images/minute)
+- OpenAI gpt-image-*: up to 5 concurrent threads (Tier 1: 5 images/minute, 100K TPM)
 - Failures are isolated per prompt — one failure doesn't halt the batch
 
 ## Integration Notes

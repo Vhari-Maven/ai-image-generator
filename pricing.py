@@ -1,7 +1,7 @@
 """
 Per-image cost lookup for AI art generators.
 
-Rates verified April 2026. Pricing drifts — when OpenAI or Google change
+Rates verified September 2026 (gpt-image-2.5 launch). Pricing drifts — when OpenAI or Google change
 rates, update the tables here. Cost embedded in past PNGs is a historical
 record of what the image cost at the time and should not be retroactively
 updated.
@@ -14,12 +14,29 @@ Sources:
 from typing import Optional
 
 
-# OpenAI gpt-image-2 — per-million-token rates (USD).
-# Verified against an actual response: gpt-image-2 reports input_tokens
-# (text prompt) and output_tokens (generated image) on response.usage.
+# OpenAI gpt-image family — per-million-token rates (USD).
+# response.usage reports input_tokens (prompt text + any reference images)
+# and output_tokens (generated image). When the generator can split out
+# reference-image tokens (usage.input_tokens_details.image_tokens) they are
+# billed at `image_input`; otherwise all input is billed as text.
 _OPENAI_TOKEN_RATES_USD_PER_M = {
-    "gpt-image-2": {"text_input": 5.00, "image_output": 30.00},
+    "gpt-image-2.5-flare":    {"text_input": 5.00, "image_input": 8.00,  "image_output": 30.00},
+    "gpt-image-2.5-sunburst": {"text_input": 5.00, "image_input": 8.00,  "image_output": 30.00},
+    "gpt-image-2":            {"text_input": 5.00, "image_input": 8.00,  "image_output": 30.00},
+    "gpt-image-1.5":          {"text_input": 5.00, "image_input": 8.00,  "image_output": 32.00},
+    "gpt-image-1":            {"text_input": 5.00, "image_input": 10.00, "image_output": 40.00},
 }
+
+
+def _openai_rates(model: str):
+    """Exact match first, then alias-prefix so dated snapshots price like
+    their alias (e.g. `gpt-image-2.5-flare-2026-09-08`)."""
+    if model in _OPENAI_TOKEN_RATES_USD_PER_M:
+        return _OPENAI_TOKEN_RATES_USD_PER_M[model]
+    for alias in sorted(_OPENAI_TOKEN_RATES_USD_PER_M, key=len, reverse=True):
+        if model.startswith(alias + "-"):
+            return _OPENAI_TOKEN_RATES_USD_PER_M[alias]
+    return None
 
 # Gemini image models — per-million-token rates (USD).
 # Image output billed at the image-output rate; text prompt billed at input rate.
@@ -36,12 +53,15 @@ def get_cost_usd(
     input_tokens: Optional[int] = None,
     output_tokens: Optional[int] = None,
     total_tokens: Optional[int] = None,
+    image_input_tokens: Optional[int] = None,
 ) -> Optional[float]:
     """
     Look up the cost in USD for a single generated image.
 
-    OpenAI gpt-image-2: priced per token (text input + image output).
-    Requires both input_tokens and output_tokens.
+    OpenAI gpt-image-*: priced per token (text input + image output).
+    Requires both input_tokens and output_tokens. `image_input_tokens`,
+    when given, is the reference-image share of `input_tokens` and is
+    billed at the (higher) image-input rate.
 
     Gemini: priced per token. If both input_tokens and output_tokens are
     given, computes the exact split. If only total_tokens is given, treats
@@ -50,12 +70,15 @@ def get_cost_usd(
 
     Returns None when pricing cannot be determined.
     """
-    if model in _OPENAI_TOKEN_RATES_USD_PER_M:
+    rates = _openai_rates(model)
+    if rates is not None:
         if input_tokens is None or output_tokens is None:
             return None
-        rates = _OPENAI_TOKEN_RATES_USD_PER_M[model]
+        image_in = min(image_input_tokens or 0, input_tokens)
+        text_in = input_tokens - image_in
         cost = (
-            input_tokens * rates["text_input"]
+            text_in * rates["text_input"]
+            + image_in * rates["image_input"]
             + output_tokens * rates["image_output"]
         ) / 1_000_000
         return round(cost, 6)

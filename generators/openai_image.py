@@ -1,7 +1,9 @@
 """OpenAI image generator.
 
-Wraps the OpenAI Images API. Defaults to `gpt-image-2`; also supports
-`gpt-image-1.5` / `gpt-image-1` for native transparent backgrounds.
+Wraps the OpenAI Images API. Defaults to `gpt-image-2.5-flare`; also
+supports `gpt-image-2.5-sunburst`, `gpt-image-2`, and `gpt-image-1.5` /
+`gpt-image-1`. Native transparent backgrounds on every model except
+`gpt-image-2`.
 """
 from __future__ import annotations
 
@@ -31,7 +33,38 @@ from config import get_config  # noqa: E402
 
 
 # Models that accept `background="transparent"` natively on the Images API.
-TRANSPARENT_CAPABLE_MODELS = ("gpt-image-1.5", "gpt-image-1")
+# gpt-image-2 is the odd one out: it never shipped transparency.
+TRANSPARENT_CAPABLE_MODELS = (
+    "gpt-image-2.5-flare",
+    "gpt-image-2.5-sunburst",
+    "gpt-image-1.5",
+    "gpt-image-1",
+)
+
+# Quality tiers accepted per model family. gpt-image-2.5 added `xhigh` and
+# `max` above the old `high` ceiling (Sept 2026). Anything else is a
+# hard error rather than a silent downgrade — the tier drives spend.
+_BASE_QUALITY_TIERS = ("auto", "low", "medium", "high")
+_GPT_IMAGE_25_QUALITY_TIERS = _BASE_QUALITY_TIERS + ("xhigh", "max")
+ALL_QUALITY_TIERS = _GPT_IMAGE_25_QUALITY_TIERS
+
+
+def quality_tiers_for(model_name: str) -> tuple:
+    """Return the quality values the Images API accepts for `model_name`.
+
+    Snapshot ids (e.g. `gpt-image-2.5-flare-2026-09-08`) match by prefix.
+    """
+    if model_name.startswith("gpt-image-2.5"):
+        return _GPT_IMAGE_25_QUALITY_TIERS
+    return _BASE_QUALITY_TIERS
+
+
+def supports_native_transparency(model_name: str) -> bool:
+    """True when the model honors `background="transparent"`.
+
+    Prefix-matched so dated snapshots resolve like their alias.
+    """
+    return any(model_name.startswith(m) for m in TRANSPARENT_CAPABLE_MODELS)
 
 
 class OpenAIImageGenerator(BaseGenerator):
@@ -61,7 +94,7 @@ class OpenAIImageGenerator(BaseGenerator):
 
         self.client = openai.OpenAI(api_key=self.api_key)
         super().__init__(get_config(config_path))
-        self.model_name = self.config.get("openai.model", "gpt-image-2")
+        self.model_name = self.config.get("openai.model", "gpt-image-2.5-flare")
 
     def generate_image(
         self,
@@ -95,10 +128,15 @@ class OpenAIImageGenerator(BaseGenerator):
             "n": num_images,
             "size": final_size,
         }
-        if final_quality in ("auto", "low", "medium", "high"):
-            api_params["quality"] = final_quality
+        allowed = quality_tiers_for(self.model_name)
+        if final_quality not in allowed:
+            raise ValueError(
+                f"quality '{final_quality}' is not supported by "
+                f"{self.model_name} (accepts: {', '.join(allowed)})"
+            )
+        api_params["quality"] = final_quality
 
-        # Native transparent-background path for gpt-image-1.5 / gpt-image-1.
+        # Native transparent-background path (every model but gpt-image-2).
         # When `remove_background: true` AND the model supports it, request
         # a transparent PNG from the API and skip the rembg postprocess.
         native_transparent = self._maybe_request_native_transparency(
@@ -188,7 +226,13 @@ class OpenAIImageGenerator(BaseGenerator):
         }
 
     def _extract_usage(self, response: Any) -> Dict[str, Optional[int]]:
-        """gpt-image-2 reports input/output/total tokens; older models may not."""
+        """gpt-image-* reports input/output/total tokens on `response.usage`.
+
+        `input_tokens_details.image_tokens` (present on the edit path, when
+        reference images were sent) is surfaced as `image_input_tokens` so
+        pricing can bill it at the image-input rate rather than the text
+        rate.
+        """
         usage_obj = getattr(response, "usage", None)
         if usage_obj is None:
             return {
@@ -196,11 +240,16 @@ class OpenAIImageGenerator(BaseGenerator):
                 "output_tokens": None,
                 "total_tokens": None,
             }
-        return {
+        details = getattr(usage_obj, "input_tokens_details", None)
+        image_input = getattr(details, "image_tokens", None) if details else None
+        usage = {
             "input_tokens": getattr(usage_obj, "input_tokens", None),
             "output_tokens": getattr(usage_obj, "output_tokens", None),
             "total_tokens": getattr(usage_obj, "total_tokens", None),
         }
+        if image_input:
+            usage["image_input_tokens"] = image_input
+        return usage
 
     # ------------------------------------------------------------------
     # Service-specific helpers
@@ -215,7 +264,7 @@ class OpenAIImageGenerator(BaseGenerator):
         is_truthy_bool = str(flag).strip().lower() in ("true", "1", "yes", "on")
         if not is_truthy_bool:
             return False
-        if self.model_name not in TRANSPARENT_CAPABLE_MODELS:
+        if not supports_native_transparency(self.model_name):
             return False
         api_params["background"] = "transparent"
         api_params["output_format"] = "png"
