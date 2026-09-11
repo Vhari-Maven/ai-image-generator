@@ -106,11 +106,16 @@ Resolution order in `config.get_api_key()`:
 
 1. **Environment variable** — `GOOGLE_AI_API_KEY` / `OPENAI_API_KEY`
 2. **`/run/secrets/`** — `google-api-key` / `openai-api-key` (devcontainer bind mount)
-3. **`config.yaml`** — `api.google_ai_key` / `api.openai_key`
+3. **gpg-encrypted file** — `~/.secrets-enc/google-api-key.gpg` /
+   `openai-api-key.gpg`, decrypted in memory via `gpg --batch -d` (needs a
+   reachable gpg-agent; nothing is written to disk). Directory overridable
+   with `ART_SECRETS_ENC_DIR` or `api.secrets_enc_dir` in `config.yaml`.
+4. **`config.yaml`** — `api.google_ai_key` / `api.openai_key`
 
-The devcontainer decrypts host keys from `~/.secrets-enc/` into podman
-secrets mounted at `/run/secrets/` (see `.devcontainer/secrets.list`),
-so in this sandbox no `.env` is needed.
+Devcontainers decrypt the same `~/.secrets-enc/` files into podman secrets
+mounted at `/run/secrets/` (see the consuming project's
+`.devcontainer/secrets.list`). On a host or distrobox with the gpg-agent
+socket available, step 3 makes the tool work with no further wiring.
 
 ## Project layout (configurable)
 
@@ -415,7 +420,9 @@ message with the install command.
 **"Module not found":** run `uv sync`, and always invoke via `uv run`.
 
 **"API key not found":** verify the resolution chain — env var,
-`/run/secrets/<provider>-api-key`, or `config.yaml`.
+`/run/secrets/<provider>-api-key`, `~/.secrets-enc/<provider>-api-key.gpg`
+(try `gpg --batch -q -d` on it by hand; a pinentry prompt means no agent),
+or `config.yaml`.
 
 **"Connection refused" / "Connection error":** the devcontainer firewall
 allowlist must include `api.openai.com` and `generativelanguage.googleapis.com`

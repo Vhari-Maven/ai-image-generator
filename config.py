@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -14,11 +16,38 @@ except ImportError:
     pass
 
 
-# Mapping: service slug → (env var, /run/secrets/ filename, config.yaml key)
+# Mapping: service slug → (env var, secret stem, config.yaml key).
+# The stem names both `/run/secrets/<stem>` and `<secrets_enc_dir>/<stem>.gpg`.
 _API_KEY_SOURCES = {
     "genai": ("GOOGLE_AI_API_KEY", "google-api-key", "api.google_ai_key"),
     "openai": ("OPENAI_API_KEY", "openai-api-key", "api.openai_key"),
 }
+
+# Where gpg-encrypted keys live when no plaintext source is available.
+# Override with ART_SECRETS_ENC_DIR or `api.secrets_enc_dir` in config.yaml.
+_DEFAULT_SECRETS_ENC_DIR = "~/.secrets-enc"
+
+
+def _decrypt_gpg_secret(path: Path) -> Optional[str]:
+    """Decrypt `path` with gpg, in memory, never prompting.
+
+    Returns None if gpg is missing, the file is absent, or decryption
+    fails (no agent, wrong key, ...). Nothing is written to disk.
+    """
+    if not path.is_file() or shutil.which("gpg") is None:
+        return None
+    try:
+        out = subprocess.run(
+            ["gpg", "--batch", "--quiet", "--decrypt", str(path)],
+            capture_output=True, text=True, timeout=20, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    value = out.stdout.strip()
+    return value or None
+
 
 
 class Config:
@@ -119,7 +148,8 @@ class Config:
     def get_api_key(self, service: str) -> Optional[str]:
         """Resolve the API key for a service.
 
-        Order: env var → /run/secrets/<name> (devcontainer bind) → config.yaml.
+        Order: env var → /run/secrets/<stem> (devcontainer bind)
+        → gpg-decrypt <secrets_enc_dir>/<stem>.gpg → config.yaml.
         """
         if service not in _API_KEY_SOURCES:
             return None
@@ -137,6 +167,17 @@ class Config:
                     return value
             except OSError:
                 pass
+
+        enc_dir = (
+            os.getenv("ART_SECRETS_ENC_DIR")
+            or self.get("api.secrets_enc_dir")
+            or _DEFAULT_SECRETS_ENC_DIR
+        )
+        value = _decrypt_gpg_secret(
+            Path(enc_dir).expanduser() / f"{secret_file}.gpg"
+        )
+        if value:
+            return value
 
         return self.get(config_key)
 

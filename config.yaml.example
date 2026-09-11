@@ -176,3 +176,10 @@ postprocess:
 
     # Backup existing cutout to assets/drafts/ before overwriting.
     backup: true
+
+# API keys — normally NOT set here. Resolution order: env var →
+# /run/secrets/<stem> → gpg-decrypt <secrets_enc_dir>/<stem>.gpg → these.
+# api:
+#   secrets_enc_dir: "~/.secrets-enc"
+#   openai_key: ""
+#   google_ai_key: ""
