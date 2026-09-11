@@ -1,128 +1,170 @@
 # AI Art Generator Configuration
 # Copy this file to config.yaml and customize as needed
 
-# Generation Settings
+# Project layout — paths are relative to the project root (CWD when the
+# CLI is invoked, or whatever --project-root points at).
+paths:
+  # Where collections of .prompts files live. Each collection is a
+  # directory under this; .prompts files may sit at any depth inside.
+  prompts_dir: prompts
+
+  # Output base for generated images. {collection} is replaced with the
+  # --collection slug; images land flat under that directory.
+  output_template: "art/{collection}"
+
 generation:
-  # Default number of images per prompt (can be overridden via CLI)
   images_per_prompt: 1
-  
-  # Default service to use
   default_service: "genai"
-  
-  # Image quality/format settings
   image_format: "png"
   optimize_images: true
-  
-  # Whether to embed prompt metadata in generated images
   embed_metadata: true
 
-# Output Settings
 output:
-  # Whether to create timestamped backups when overwriting existing images
   create_backups: true
-  
-  # Whether to organize images in subdirectories by category
-  organize_by_category: true
 
-# Google GenAI Specific Settings
+# Google GenAI — Gemini image models via generateContent API (Nano Banana family)
 genai:
-  model: "imagen-3.0-generate-002"
-  
-  # Default settings for all generation
+  # Options:
+  #   gemini-3.1-flash-image-preview  (Nano Banana 2 — fast, advanced reasoning; default)
+  #   gemini-3-pro-image-preview      (Nano Banana Pro — highest fidelity, best text rendering)
+  #   gemini-2.5-flash-image          (Nano Banana — cheapest, lowest latency)
+  model: "gemini-3.1-flash-image-preview"
+
+  # Default when no .prompts header / per-entry override / CLI flag supplies one.
   defaults:
     aspect_ratio: "1:1"
-    safety_filter_level: "BLOCK_LOW_AND_ABOVE"
-    person_generation: "ALLOW_ADULT"
-  
-  # Category-specific overrides
-  categories:
-    background:
-      aspect_ratio: "16:9"
-      safety_filter_level: "BLOCK_LOW_AND_ABOVE"
-      person_generation: "ALLOW_ADULT"
-    
-    character:
-      aspect_ratio: "3:4" 
-      safety_filter_level: "BLOCK_LOW_AND_ABOVE"
-      person_generation: "ALLOW_ADULT"
 
-# OpenAI GPT-4o Specific Settings
+  # Supported aspect ratios (Gemini 3.x):
+  # 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9, 1:4, 4:1, 1:8, 8:1
+  models:
+    "gemini-3.1-flash-image-preview":
+      max_images: 1
+      rpm_limit: 50
+
+    "gemini-3-pro-image-preview":
+      max_images: 1
+      rpm_limit: 50
+
+    "gemini-2.5-flash-image":
+      max_images: 1
+      rpm_limit: 50
+
+# OpenAI Image Generation Settings (gpt-image-2)
 openai:
-  model: "gpt-image-1"
-  
-  # Default settings for all generation
+  model: "gpt-image-2"
+
+  # Defaults when no .prompts header / per-entry override / CLI flag supplies
+  # a value.
   defaults:
     size: "1024x1024"
-    quality: "standard"
+    quality: "auto"
     style: "natural"
-  
-  # Category-specific overrides
-  categories:
-    background:
-      size: "1536x1024"  # Landscape format for backgrounds
-      quality: "standard"
-      style: "natural"
-    
-    character:
-      size: "1024x1536"  # Portrait format for characters
-      quality: "standard"
-      style: "vivid"  # More vibrant for character portraits
 
-# Google Vertex AI Specific Settings (supports Imagen 3 and Imagen 4)
-vertex:
-  # Default model (can be overridden via CLI)
-  model: "imagen-4.0-generate-preview-06-06"
-  
-  # Google Cloud Project configuration
-  project_id: null  # Set via GOOGLE_CLOUD_PROJECT environment variable
-  location: "us-central1"  # Or set via GOOGLE_CLOUD_LOCATION
-  
-  # Default settings for all generation
-  defaults:
-    aspect_ratio: "1:1"
-    quality: "standard"  # For Imagen 4: fast/standard/ultra
-    safety_filter_level: "block_some"
-    person_generation: "allow_adult"
-    add_watermark: false  # Only supported by Imagen 3
-  
-  # Category-specific overrides
-  categories:
-    background:
-      aspect_ratio: "16:9"
-      quality: "standard"  # For Imagen 4: fast/standard/ultra
-      safety_filter_level: "block_some"
-      person_generation: "allow_adult"
-      add_watermark: false
-    
-    character:
-      aspect_ratio: "3:4"
-      quality: "standard"  # For Imagen 4: fast/standard/ultra
-      safety_filter_level: "block_some"
-      person_generation: "allow_adult"
-      add_watermark: false
-  
-  # Model-specific capabilities and limits
-  models:
-    "imagen-3.0-generate-002":
-      max_images: 8
-      rpm_limit: 50
-      supports_watermark: true
-      supports_seed: true
-    
-    "imagen-4.0-generate-preview-06-06":
-      max_images: 4
-      rpm_limit: 20
-      supports_watermark: false
-      supports_seed: false
-    
-    "imagen-4.0-fast-generate-preview-06-06":
-      max_images: 4
-      rpm_limit: 20
-      supports_watermark: false
-      supports_seed: false
-    
-    "imagen-4.0-ultra-generate-preview-06-06":
-      max_images: 4
-      rpm_limit: 20
-      supports_watermark: false
-      supports_seed: false
+# Post-processing run after image generation. Each step is opt-in via the
+# .prompts header field of the same name (e.g. `remove_background: true`).
+# All tunables live here — there are no CLI flags for these knobs, by design,
+# because the chroma-key and dead-pixel parameters are interrelated and
+# shouldn't drift between ad-hoc invocations and pipeline runs.
+postprocess:
+  remove_background:
+    # rembg model. birefnet-massive also handles flat/dark/low-contrast
+    # objects that isnet-anime leaves partial-alpha (pale-wash cutout);
+    # see the idol-rune A/B in img/experiments/. Alternatives: isnet-anime
+    # (prior default, anime/illustration tuned), birefnet-portrait,
+    # birefnet-general, isnet-general-use.
+    model: "birefnet-massive"
+
+    # rembg trimap alpha matting (pymatting closed-form) — gives continuous
+    # alpha at hair / fur edges. Pair with `decontaminate_foreground` below.
+    alpha_matting: true
+    alpha_matting_foreground_threshold: 240
+    alpha_matting_background_threshold: 10
+    alpha_matting_erode_size: 10
+
+    # Solve I = α·F + (1−α)·B for unmixed foreground via
+    # pymatting.estimate_foreground_ml — removes key-color spill at
+    # partial-alpha pixels by construction. Fixes hair-halo / aura.
+    decontaminate_foreground: true
+
+    # Interior despill — channel-clamp on α=255 pixels with backdrop-hue
+    # awareness. Catches key-color tint the diffusion model painted into
+    # opaque shadow regions of hair / skin / fabric (decontamination
+    # above is a no-op on α=255). The threshold protects chroma-near-key
+    # accents (e.g. a teal jewel against a green key) from desaturation;
+    # raise it if legitimate accents get touched, lower it if interior
+    # tint persists.
+    #
+    # `despill_redistribute` controls what to do with the clipped excess.
+    # Default 0.0: clamp only, corrected pixel desaturates toward neutral
+    # grey. Any nonzero value adds a fraction of the spill into the
+    # complementary channel(s), pushing the corrected pixel toward the
+    # complementary hue of the key — this produces a complementary-cast
+    # halo on the silhouette edge that boundary cleanup cannot catch
+    # (cleanup only mops up key-hue tints). The halo is invisible only
+    # when the foreground happens to share that complementary hue family
+    # (e.g. magenta halo from green key on a pink subject); against any
+    # other background it reads as a wrong-color rim. Keep at 0 unless
+    # you have a specific reason to bias toward the complement.
+    despill_interior: true
+    despill_threshold: 8
+    despill_redistribute: 0.0
+
+    # Boundary cleanup — proximity-gated cleanup of opaque key-hue
+    # contamination near the silhouette edge. Pass A drops saturated
+    # key-hue blobs (olive smudges the YCbCr matte missed) to α=0;
+    # pass B recolors weakly-tinted opaque pixels by sampling the
+    # nearest non-tinted opaque neighbor's hue at the suspicious
+    # pixel's luminance — green-cast hair shadows next to cyan strands
+    # adopt cyan-at-shadow-luma instead of desaturating to grey
+    # (despill's only available fallback). The radius_px gate (a
+    # binary dilation of α<pocket_alpha_threshold) confines both passes
+    # to the silhouette edge band, so saturated foreground far from any
+    # hole is never touched. Lower drop_hue_margin / drop_saturation to
+    # bite more aggressively; raise them if legitimate key-hue accents
+    # near the silhouette get dropped.
+    boundary_cleanup: true
+    boundary_cleanup_radius_px: 8
+    # Pass A drops to α=0 only if key_excess > this. 25 is strong enough
+    # to catch clear key-spill residue (Δg=+30+) without dropping mildly
+    # green-tinted hair (Δg=+5..+25), which falls through to Pass B's
+    # nearest-clean-neighbor recolor. Lower values were correct for
+    # bright-residue capture but also dropped soft-edge "thin hair over
+    # key" pixels that should be kept and desaturated.
+    boundary_cleanup_drop_hue_margin: 25
+    boundary_cleanup_drop_saturation: 20
+    boundary_cleanup_recolor_hue_margin: 2
+    boundary_cleanup_min_alpha: 200
+    boundary_cleanup_island_min_alpha: 5
+    boundary_cleanup_island_max_size: 500
+    boundary_cleanup_island_hue_margin: 4
+
+    # Chroma key. "auto" detects per-source from corner pixels (handles
+    # mixed batches); "#RRGGBB" fixes the key; false/null disables.
+    # QUOTE hex values — an unquoted `chroma_key: #FF00FF` is a YAML
+    # comment, i.e. null, which silently disables every chroma stage.
+    chroma_key: "auto"
+    chroma_tolerance: 150.0
+    chroma_dominance: 35
+    chroma_off_channel_ceiling: 170
+    chroma_off_channel_asymmetry: 70
+    chroma_opaque_threshold: 100
+    chroma_max_alpha: 254
+
+    # YCbCr chroma-key matte combined with segmentation α (`min`) so both
+    # must agree a pixel is foreground. Catches interior pockets and
+    # preserves chroma-distant accents (cyan vs green key, etc.).
+    use_chroma_matte: true
+    chroma_matte_inner_radius: 25.0
+    chroma_matte_outer_radius: 60.0
+    chroma_matte_combine: "min"
+
+    # Dead-pixel fill: alpha=0 pixels with at least N opaque neighbors get
+    # alpha restored. Set to null to disable.
+    dead_pixel_threshold: 6
+
+    # Trim to silhouette's alpha bounding box, ignoring sub-threshold residue.
+    trim: true
+    trim_threshold: 10
+
+    # Backup existing cutout to assets/drafts/ before overwriting.
+    backup: true
