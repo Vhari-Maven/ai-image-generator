@@ -20,6 +20,9 @@ generation:
   embed_metadata: true
 
 output:
+  # Before overwriting an existing image, copy it to a sibling drafts/
+  # directory next to it (<output_dir>/drafts/<name>_<timestamp>.png).
+  # Default on; the postprocess cutout writer honors its own `backup:` below.
   create_backups: true
 
 # Google GenAI — Gemini image models via generateContent API (Nano Banana family)

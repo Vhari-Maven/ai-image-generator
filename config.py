@@ -93,7 +93,7 @@ class Config:
                 "optimize_images": True,
                 "embed_metadata": True,
             },
-            "output": {"create_backups": False},
+            "output": {"create_backups": True},
             "genai": {
                 "model": "gemini-3.1-flash-image-preview",
                 "defaults": {"aspect_ratio": "1:1"},

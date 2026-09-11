@@ -103,10 +103,8 @@ actually runs.
 """
 from __future__ import annotations
 
-import shutil
 import sys
 from dataclasses import dataclass
-from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
@@ -434,29 +432,10 @@ def detect_chroma_key(arr_module, rgb_image, patch_size: int = 64,
 # Output-path utilities
 # ---------------------------------------------------------------------------
 
-def find_repo_root(start: Path) -> Path:
-    """Walk up from `start` looking for a .git directory; fall back to cwd."""
-    current = start.resolve().parent if start.is_file() else start.resolve()
-    while current != current.parent:
-        if (current / ".git").exists():
-            return current
-        current = current.parent
-    return Path.cwd()
-
-
-def backup_existing(output_path: Path) -> Path:
-    """Copy an existing output to <repo_root>/assets/drafts/ with a timestamp.
-
-    The original stays in place (the caller overwrites it next). Backups
-    accumulate — assets/drafts/ is gitignored and never pruned.
-    """
-    repo_root = find_repo_root(output_path)
-    backup_dir = repo_root / "assets" / "drafts"
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = backup_dir / f"{output_path.stem}_{timestamp}_backup{output_path.suffix}"
-    shutil.copy2(output_path, backup_path)
-    return backup_path
+def backup_existing(output_path: Path) -> Optional[Path]:
+    """Copy an existing output to a sibling `drafts/` dir (see backup.py)."""
+    from backup import backup_existing as _backup
+    return _backup(output_path)
 
 
 # ---------------------------------------------------------------------------

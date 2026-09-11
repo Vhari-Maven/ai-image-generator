@@ -410,7 +410,8 @@ art-generator-remove-bg --collection <slug>
 ```
 
 Batch defaults to overwriting existing `<stem>-cutout.png` files
-(`backup: true` in config saves the prior cutout). Pass `--skip-existing`
+(`backup: true` in config saves the prior cutout to a sibling `drafts/`
+directory, the same place `output.create_backups` puts prior renders). Pass `--skip-existing`
 to skip files that already have a cutout. Useful for tuning chroma-matte
 parameters in `config.yaml` and re-processing a whole collection.
 

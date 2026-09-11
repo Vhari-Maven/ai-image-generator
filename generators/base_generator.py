@@ -39,7 +39,6 @@ from __future__ import annotations
 
 import io
 import os
-import shutil
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -56,6 +55,7 @@ if str(parent_dir) not in sys.path:
 
 from prompts.parser import ArtPrompt  # noqa: E402
 from pricing import get_cost_usd  # noqa: E402
+from backup import backup_existing  # noqa: E402
 
 
 class BaseGenerator:
@@ -261,18 +261,11 @@ class BaseGenerator:
         """Save with optional backup of the prior file at the same path."""
         if (
             os.path.exists(save_path)
-            and self.config.get("output.create_backups", False)
+            and self.config.get("output.create_backups", True)
         ):
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            base_name, extension = os.path.splitext(os.path.basename(save_path))
-            repo_root = self._find_repo_root(save_path)
-            backup_dir = os.path.join(repo_root, "assets", "drafts")
-            os.makedirs(backup_dir, exist_ok=True)
-            backup_path = os.path.join(
-                backup_dir, f"{base_name}_{timestamp}_backup{extension}"
-            )
-            shutil.copy2(save_path, backup_path)
-            print(f"  📁 Backed up existing file to: {backup_path}")
+            backup_path = backup_existing(save_path)
+            if backup_path:
+                print(f"  📁 Backed up existing file to: {backup_path}")
 
         pil_image = self._convert_to_pil(image_data)
 
@@ -307,11 +300,3 @@ class BaseGenerator:
         if isinstance(image_data, bytes):
             return Image.open(io.BytesIO(image_data))
         return image_data
-
-    def _find_repo_root(self, file_path: str) -> str:
-        current_path = os.path.dirname(os.path.abspath(file_path))
-        while current_path != os.path.dirname(current_path):
-            if os.path.exists(os.path.join(current_path, ".git")):
-                return current_path
-            current_path = os.path.dirname(current_path)
-        return os.getcwd()
