@@ -8,3 +8,7 @@ config.yaml
 
 # Secrets
 .env
+
+# Local testing project root (see sandbox/README.md)
+sandbox/*
+!sandbox/README.md
