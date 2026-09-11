@@ -32,6 +32,18 @@ if TYPE_CHECKING:
     from prompts.parser import ArtPrompt
 
 
+_OFF_VALUES = ("false", "0", "no", "off", "none", "null", "")
+
+
+def flag_enabled(flag) -> bool:
+    """True when a `.prompts` stage switch is set to anything but an
+    explicit off value. Lets a per-entry `remove_background: false` /
+    `slice_grid: none` opt out of a header-level setting."""
+    if flag is None:
+        return False
+    return str(flag).strip().lower() not in _OFF_VALUES
+
+
 @runtime_checkable
 class PostprocessStage(Protocol):
     """Contract every post-process stage implements.

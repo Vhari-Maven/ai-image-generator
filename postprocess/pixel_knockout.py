@@ -335,8 +335,8 @@ class PixelArtKnockoutStage:
     name = "pixel_art_knockout"
 
     def applies(self, prompt: "ArtPrompt") -> bool:
-        flag = getattr(prompt, "pixel_art_knockout", None)
-        return flag is not None and str(flag).strip() != ""
+        from .pipeline import flag_enabled
+        return flag_enabled(getattr(prompt, "pixel_art_knockout", None))
 
     def apply(self, image_path: Path, prompt: "ArtPrompt", config) -> None:
         flag = getattr(prompt, "pixel_art_knockout", None)

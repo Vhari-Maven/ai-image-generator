@@ -410,8 +410,8 @@ class SliceStage:
     name = "slice_grid"
 
     def applies(self, prompt: "ArtPrompt") -> bool:
-        flag = getattr(prompt, "slice_grid", None)
-        return flag is not None and str(flag).strip() != ""
+        from .pipeline import flag_enabled
+        return flag_enabled(getattr(prompt, "slice_grid", None))
 
     def apply(self, image_path: Path, prompt: "ArtPrompt", config) -> None:
         spec = str(getattr(prompt, "slice_grid"))

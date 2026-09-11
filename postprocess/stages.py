@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .pipeline import flag_enabled
 from .remove_bg import (
     BgRemovalNotInstalled,
     RemoveBgConfig,
@@ -22,9 +23,7 @@ if TYPE_CHECKING:
 
 
 def _is_truthy(flag) -> bool:
-    if flag is None:
-        return False
-    return str(flag).strip().lower() not in ("false", "0", "no", "off", "")
+    return flag_enabled(flag)
 
 
 def _is_bool_truthy(flag) -> bool:

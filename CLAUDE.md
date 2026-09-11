@@ -328,7 +328,8 @@ Post-processing runs as a **pipeline of stages**. After every successful
 image save, generators call `BaseGenerator._run_postprocess(prompt, save_path)`,
 which delegates to `postprocess.run_pipeline(image_path, prompt, config)`.
 The pipeline walks every registered stage in declared order, asks each
-`applies(prompt)` (typically reads a `.prompts` header field), and runs
+`applies(prompt)` (reads a `.prompts` switch — per-entry value, else the
+file header), and runs
 `apply()` for the ones that opt in.
 
 Stages today (registration order = execution order):
@@ -346,11 +347,17 @@ Stages today (registration order = execution order):
    Examples: `slice_grid: 4x2`, `slice_grid: 4x2 uniform`,
    `slice_grid: 4x2 grid padding=4`.
 
-Deeper docs for `RemoveBackgroundStage`, gated by the
-`remove_background:` field in the `.prompts` file header. Truthy values
-(`true`, `yes`, …) run with config defaults; any other string is treated
-as a rembg model-name override (e.g. `birefnet-portrait`); falsey values
-(`false`, `no`, omitted) skip the stage. On success, writes a sibling
+Every stage switch (`remove_background:`, `pixel_art_knockout:`,
+`slice_grid:`), like `service:` / `model:`, may be set in the file header
+or in an entry block; **the entry value wins**, so a mixed file can set
+`remove_background: true` in the header and `remove_background: false`
+on the one opaque scene. Off values are `false`, `no`, `0`, `off`,
+`none`, `null`.
+
+Deeper docs for `RemoveBackgroundStage`, gated by `remove_background:`.
+Truthy values (`true`, `yes`, …) run with config defaults; any other
+string is treated as a rembg model-name override (e.g.
+`birefnet-portrait`); off values or omission skip the stage. On success, writes a sibling
 `<stem>-cutout.png` next to the source.
 
 **Failures are non-fatal.** A stage's `apply()` raising prints a warning

@@ -36,6 +36,14 @@ from typing import Dict, List, Optional, Tuple
 # slot; unrecognized keys are silently dropped.
 PER_ENTRY_OVERRIDE_KEYS = ("size", "aspect_ratio", "quality", "style")
 
+# Post-process switches and engine selection may also be set per entry;
+# the entry value wins over the file header (a per-entry `false` turns a
+# header-level `true` off for that image). Kept apart from
+# PER_ENTRY_OVERRIDE_KEYS because they are surfaced as dedicated ArtPrompt
+# fields, not via the generic `overrides` dict.
+PER_ENTRY_STAGE_KEYS = ("remove_background", "pixel_art_knockout", "slice_grid")
+PER_ENTRY_ENGINE_KEYS = ("service", "model")
+
 # All keys the entry-block parser treats as metadata. Lines whose key isn't
 # in this set are taken to be the start of the prompt body — this lets the
 # `.prompts` format keep its conventional visual separation between the
@@ -45,6 +53,8 @@ PER_ENTRY_OVERRIDE_KEYS = ("size", "aspect_ratio", "quality", "style")
 KNOWN_ENTRY_METADATA_KEYS = (
     {"filename", "title", "description", "type", "tags", "input_images"}
     | set(PER_ENTRY_OVERRIDE_KEYS)
+    | set(PER_ENTRY_STAGE_KEYS)
+    | set(PER_ENTRY_ENGINE_KEYS)
 )
 
 
@@ -79,7 +89,8 @@ class ArtPrompt:
     # a subset of PER_ENTRY_OVERRIDE_KEYS. Sit between CLI flags (highest)
     # and config defaults (lowest); see BaseGenerator._resolve_param.
     overrides: Dict[str, str] = field(default_factory=dict)
-    # Post-process flag from the .prompts file header. Truthy bool-like
+    # Post-process flag from the .prompts entry block, else file header.
+    # Truthy bool-like
     # strings gate the bg-removal pass; any other string is treated as a
     # rembg model-name override (e.g. "birefnet-portrait").
     remove_background: Optional[str] = None
@@ -158,6 +169,12 @@ class PromptsFileEntry:
     # the file-level header value when set.
     input_images: Optional[str] = None
 
+    def _entry_or_header(self, key: str) -> Optional[str]:
+        value = self.entry_overrides.get(key)
+        if value is None and self.file_header is not None:
+            value = getattr(self.file_header, key, None)
+        return value
+
     def to_art_prompt(
         self,
         collection_name: str,
@@ -179,21 +196,12 @@ class PromptsFileEntry:
             if value is not None:
                 overrides[key] = value
 
-        remove_background = (
-            self.file_header.remove_background
-            if self.file_header is not None
-            else None
-        )
-        pixel_art_knockout = (
-            self.file_header.pixel_art_knockout
-            if self.file_header is not None
-            else None
-        )
-        slice_grid = (
-            self.file_header.slice_grid
-            if self.file_header is not None
-            else None
-        )
+        # Post-process switches: entry value wins over file header, so a
+        # per-entry `remove_background: false` can opt one image out of a
+        # header-level `true` (and vice versa).
+        remove_background = self._entry_or_header("remove_background")
+        pixel_art_knockout = self._entry_or_header("pixel_art_knockout")
+        slice_grid = self._entry_or_header("slice_grid")
 
         # input_images: entry value wins over file header.
         raw_inputs = self.input_images
@@ -203,12 +211,8 @@ class PromptsFileEntry:
         # service / model: entry override wins over file header. Left None
         # when neither declares them — the runner fills in CLI flag then
         # config default.
-        service = self.entry_overrides.get("service")
-        if service is None and self.file_header is not None:
-            service = self.file_header.service
-        model = self.entry_overrides.get("model")
-        if model is None and self.file_header is not None:
-            model = self.file_header.model
+        service = self._entry_or_header("service")
+        model = self._entry_or_header("model")
 
         return ArtPrompt(
             id=self.id,
@@ -352,7 +356,11 @@ class PromptsFileParser:
             ]
             entry_overrides = {
                 key: metadata[key]
-                for key in PER_ENTRY_OVERRIDE_KEYS
+                for key in (
+                    PER_ENTRY_OVERRIDE_KEYS
+                    + PER_ENTRY_STAGE_KEYS
+                    + PER_ENTRY_ENGINE_KEYS
+                )
                 if metadata.get(key)
             }
 
