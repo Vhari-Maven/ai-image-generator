@@ -15,12 +15,15 @@ its own repo.
 
 ## Supported Models (September 2026)
 
+The default service is **OpenAI** (`generation.default_service`); Google
+GenAI is selected per file with `service: genai` or via `--service`.
+
 **Google GenAI** — all images generated through the Gemini API's
 `generateContent` endpoint (Nano Banana family):
 
 | Model ID | Nickname | Use case |
 |---|---|---|
-| `gemini-3.1-flash-image-preview` | Nano Banana 2 | **Default.** Fast + advanced reasoning, strong text rendering |
+| `gemini-3.1-flash-image-preview` | Nano Banana 2 | **GenAI default.** Fast + advanced reasoning, strong text rendering |
 | `gemini-3-pro-image-preview` | Nano Banana Pro | Highest fidelity, best text rendering, slowest/most expensive |
 | `gemini-2.5-flash-image` | Nano Banana | Cheapest, lowest latency, older generation |
 
@@ -35,7 +38,7 @@ Notes:
 
 | Model ID | Released | Quality tiers | Native transparency | Use case |
 |---|---|---|---|---|
-| `gpt-image-2.5-sunburst` | 2026-09-08 | auto, low, medium, high, **xhigh, max** | yes | **Default.** Most polished output; tighter control across edits. Same token price as flare, ~1.5-2x slower |
+| `gpt-image-2.5-sunburst` | 2026-09-08 | auto, low, medium, high, **xhigh, max** | yes | **Default (service and model).** Most polished output; tighter control across edits. Same token price as flare, ~1.5-2x slower |
 | `gpt-image-2.5-flare` | 2026-09-08 | same as sunburst | yes | Same price and features, ~50% lower latency than gpt-image-2. Pick for fast iteration loops |
 | `gpt-image-2` | 2026-04 | auto, low, medium, high | **no** | Prior default; keep for reproducing older renders |
 | `gpt-image-1.5` | 2025-12 | auto, low, medium, high | yes | Legacy transparent path (pre-2.5) |

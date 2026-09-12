@@ -286,7 +286,7 @@ def test_service_connection(service: str, api_key: Optional[str] = None) -> None
 
 def main() -> None:
     config = get_config()
-    default_service = config.get("generation.default_service", "genai")
+    default_service = config.get("generation.default_service", "openai")
 
     parser = _build_parser(default_service)
     args = parser.parse_args()

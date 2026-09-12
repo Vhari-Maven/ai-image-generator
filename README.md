@@ -41,11 +41,11 @@ Resolution order: env var → `/run/secrets/<provider>-api-key` → `config.yaml
 ## Models
 
 **Google GenAI** (Gemini `generateContent` API):
-- `gemini-3.1-flash-image-preview` — Nano Banana 2 (default)
+- `gemini-3.1-flash-image-preview` — Nano Banana 2 (GenAI default)
 - `gemini-3-pro-image-preview` — Nano Banana Pro (highest fidelity)
 - `gemini-2.5-flash-image` — Nano Banana (cheapest)
 
-**OpenAI**:
+**OpenAI** (default service):
 - `gpt-image-2.5-sunburst` — default; most polished output, quality up to `max`, native transparency
 - `gpt-image-2.5-flare` — same price and features, faster; good for iteration
 - `gpt-image-2` — prior default; no native transparency

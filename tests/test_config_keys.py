@@ -57,3 +57,8 @@ def test_gpg_failure_falls_through_to_config(cfg, tmp_path, monkeypatch):
 def test_missing_gpg_file_is_silent(cfg, tmp_path, monkeypatch):
     monkeypatch.setenv("ART_SECRETS_ENC_DIR", str(tmp_path / "nope"))
     assert cfg.get_api_key("openai") is None
+
+
+def test_default_service_is_openai(tmp_path):
+    (tmp_path / "config.yaml").write_text("{}\n")
+    assert Config(str(tmp_path / "config.yaml")).get("generation.default_service") == "openai"

@@ -88,7 +88,7 @@ class Config:
             },
             "generation": {
                 "images_per_prompt": 1,
-                "default_service": "genai",
+                "default_service": "openai",
                 "image_format": "png",
                 "optimize_images": True,
                 "embed_metadata": True,
