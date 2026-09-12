@@ -35,8 +35,8 @@ Notes:
 
 | Model ID | Released | Quality tiers | Native transparency | Use case |
 |---|---|---|---|---|
-| `gpt-image-2.5-flare` | 2026-09-08 | auto, low, medium, high, **xhigh, max** | yes | **Default.** ~50% lower latency than gpt-image-2 at the same token price; OpenAI's recommended everyday model |
-| `gpt-image-2.5-sunburst` | 2026-09-08 | same as flare | yes | Premium: tighter control across multi-turn edits, product/campaign polish. Slower. Same token price as flare |
+| `gpt-image-2.5-sunburst` | 2026-09-08 | auto, low, medium, high, **xhigh, max** | yes | **Default.** Most polished output; tighter control across edits. Same token price as flare, ~1.5-2x slower |
+| `gpt-image-2.5-flare` | 2026-09-08 | same as sunburst | yes | Same price and features, ~50% lower latency than gpt-image-2. Pick for fast iteration loops |
 | `gpt-image-2` | 2026-04 | auto, low, medium, high | **no** | Prior default; keep for reproducing older renders |
 | `gpt-image-1.5` | 2025-12 | auto, low, medium, high | yes | Legacy transparent path (pre-2.5) |
 | `gpt-image-1` | 2025-04 | auto, low, medium, high | yes | Legacy |
@@ -176,14 +176,14 @@ uv run --project tools/ai_art_generator art-generator \
 uv run --project tools/ai_art_generator art-generator \
   --collection my-set --image-id base --model gemini-3-pro-image-preview
 
-# OpenAI (default gpt-image-2.5-flare)
+# OpenAI (default gpt-image-2.5-sunburst)
 uv run --project tools/ai_art_generator art-generator \
   --collection my-set --image-id base --service openai --quality high
 
-# OpenAI premium tier
+# OpenAI fast iteration
 uv run --project tools/ai_art_generator art-generator \
   --collection my-set --image-id base --service openai \
-  --model gpt-image-2.5-sunburst --quality xhigh
+  --model gpt-image-2.5-flare --quality medium
 ```
 
 **Batch:**

@@ -55,8 +55,8 @@ def gen(monkeypatch):
 
 
 class TestRequestAssembly:
-    def test_default_model_is_flare(self, gen):
-        assert gen.model_name == "gpt-image-2.5-flare"
+    def test_default_model_is_sunburst(self, gen):
+        assert gen.model_name == "gpt-image-2.5-sunburst"
 
     def test_transparency_requested_on_flare(self, gen):
         gen.model_name = "gpt-image-2.5-flare"

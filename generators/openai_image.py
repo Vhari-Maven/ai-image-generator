@@ -1,7 +1,7 @@
 """OpenAI image generator.
 
-Wraps the OpenAI Images API. Defaults to `gpt-image-2.5-flare`; also
-supports `gpt-image-2.5-sunburst`, `gpt-image-2`, and `gpt-image-1.5` /
+Wraps the OpenAI Images API. Defaults to `gpt-image-2.5-sunburst`; also
+supports `gpt-image-2.5-flare`, `gpt-image-2`, and `gpt-image-1.5` /
 `gpt-image-1`. Native transparent backgrounds on every model except
 `gpt-image-2`.
 """
@@ -94,7 +94,7 @@ class OpenAIImageGenerator(BaseGenerator):
 
         self.client = openai.OpenAI(api_key=self.api_key)
         super().__init__(get_config(config_path))
-        self.model_name = self.config.get("openai.model", "gpt-image-2.5-flare")
+        self.model_name = self.config.get("openai.model", "gpt-image-2.5-sunburst")
 
     def generate_image(
         self,

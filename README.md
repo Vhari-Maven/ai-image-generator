@@ -46,8 +46,8 @@ Resolution order: env var → `/run/secrets/<provider>-api-key` → `config.yaml
 - `gemini-2.5-flash-image` — Nano Banana (cheapest)
 
 **OpenAI**:
-- `gpt-image-2.5-flare` — default; fastest, quality up to `max`, native transparency
-- `gpt-image-2.5-sunburst` — premium; tighter multi-edit control, slower, same price
+- `gpt-image-2.5-sunburst` — default; most polished output, quality up to `max`, native transparency
+- `gpt-image-2.5-flare` — same price and features, faster; good for iteration
 - `gpt-image-2` — prior default; no native transparency
 - `gpt-image-1.5` / `gpt-image-1` — legacy; native transparency
 

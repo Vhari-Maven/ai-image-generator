@@ -113,7 +113,7 @@ class Config:
                 },
             },
             "openai": {
-                "model": "gpt-image-2.5-flare",
+                "model": "gpt-image-2.5-sunburst",
                 "defaults": {
                     "size": "1024x1024",
                     "quality": "auto",
