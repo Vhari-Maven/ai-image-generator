@@ -138,10 +138,13 @@ Examples:
 
     misc = parser.add_argument_group("misc")
     misc.add_argument("--project-root",
-                      help="Project root (defaults to CWD). Prompts and outputs "
-                           "are resolved relative to this path.")
+                      help="Project root (defaults to CWD). --collection, "
+                           "--prompts-file, --prompts-dir, --output-dir and "
+                           "the output template all resolve relative to it.")
     misc.add_argument("--output-dir",
-                      help="Override output directory (else uses paths.output_template)")
+                      help="Override output directory (else paths.output_template "
+                           "under the project root). Relative paths resolve "
+                           "against the project root.")
     misc.add_argument("--dry-run", action="store_true",
                       help="Resolve prompts and print plan; do not call the API")
     misc.add_argument("--verbose", "-v", action="store_true",
@@ -154,10 +157,53 @@ Examples:
 # Source → prompts
 # ----------------------------------------------------------------------
 
+def _resolve_input_path(raw: str, project_root: Path) -> Path:
+    """Resolve a --prompts-file / --prompts-dir argument.
+
+    Absolute paths are used verbatim. Relative paths resolve against the
+    project root first (the documented contract), then fall back to the
+    CWD so `--project-root sandbox --prompts-file sandbox/prompts/x.prompts`
+    keeps working.
+    """
+    path = Path(raw)
+    if path.is_absolute():
+        return path
+    under_root = project_root / path
+    if under_root.exists():
+        return under_root
+    return path
+
+
+def resolve_output_dir(
+    *,
+    project_root: Path,
+    output_template: str,
+    collection_name: str,
+    cli_output_dir: Optional[str] = None,
+    header_output_dir: Optional[str] = None,
+) -> Path:
+    """Single source of truth for where generated images land.
+
+    Precedence: --output-dir > .prompts header `output_dir` > the
+    `paths.output_template` formatted with the collection name. Every
+    branch is anchored at `project_root` unless given an absolute path, so
+    the three source modes (--collection / --prompts-file / --prompts-dir)
+    all land in the same place for the same collection.
+    """
+    chosen = cli_output_dir or header_output_dir
+    if chosen:
+        path = Path(chosen)
+        return path if path.is_absolute() else project_root / path
+    return project_root / output_template.format(collection=collection_name)
+
+
 def parse_prompts_from_source(
     args, prompts_parser: PromptsFileParser
 ) -> Tuple[List[ArtPrompt], Optional[PromptsFileHeader]]:
-    """Resolve `args` to (prompts, optional file/collection header)."""
+    """Resolve `args` to (prompts, optional file/collection header,
+    collection name). The collection name is what the output template is
+    formatted with — the slug for --collection, else the parent directory
+    name of the file / the directory name for --prompts-dir."""
 
     if args.collection:
         collection_dir = prompts_parser.prompts_dir / args.collection
@@ -198,10 +244,10 @@ def parse_prompts_from_source(
             entry.to_art_prompt(args.collection, prompts_parser.output_template)
             for entry in all_entries
         ]
-        return prompts, collection_header
+        return prompts, collection_header, args.collection
 
     if args.prompts_file:
-        file_path = Path(args.prompts_file)
+        file_path = _resolve_input_path(args.prompts_file, prompts_parser.project_root)
         if not file_path.exists():
             print(f"Error: File '{file_path}' does not exist")
             sys.exit(1)
@@ -218,10 +264,10 @@ def parse_prompts_from_source(
             entry.to_art_prompt(collection_name, prompts_parser.output_template)
             for entry in entries
         ]
-        return prompts, header
+        return prompts, header, collection_name
 
     if args.prompts_dir:
-        dir_path = Path(args.prompts_dir)
+        dir_path = _resolve_input_path(args.prompts_dir, prompts_parser.project_root)
         if not dir_path.exists():
             print(f"Error: Directory '{dir_path}' does not exist")
             sys.exit(1)
@@ -239,7 +285,7 @@ def parse_prompts_from_source(
             entry.to_art_prompt(collection_name, prompts_parser.output_template)
             for entry in entries
         ]
-        return prompts, None
+        return prompts, None, collection_name
 
     print("Error: No valid source specified")
     sys.exit(1)
@@ -325,7 +371,9 @@ def main() -> None:
 
     # ---- Parse prompts ----
     try:
-        prompts, file_header = parse_prompts_from_source(args, prompts_parser)
+        prompts, file_header, collection_name = parse_prompts_from_source(
+            args, prompts_parser
+        )
     except Exception as e:
         print(f"Error parsing prompts: {e}")
         sys.exit(1)
@@ -334,14 +382,26 @@ def main() -> None:
         print("No prompts found from the specified source")
         sys.exit(1)
 
-    # ---- Apply file-level header default for output_dir ----
+    # ---- Resolve the output directory (service-independent) ----
     # Service + model are resolved per-prompt below (each ArtPrompt carries
-    # its own, so one collection can mix engines), so only output_dir merges
-    # into args here. Per-image keys (size, aspect_ratio, quality, style) ride
-    # on each ArtPrompt.overrides and resolve inside the generator.
-    if file_header and not args.output_dir and file_header.output_dir:
-        args.output_dir = file_header.output_dir
-        print(f"Using output directory from file header: {args.output_dir}")
+    # its own, so one collection can mix engines). Per-image keys (size,
+    # aspect_ratio, quality, style) ride on each ArtPrompt.overrides and
+    # resolve inside the generator. The output dir is the one thing that
+    # is decided once, here, for every source mode.
+    header_output_dir = file_header.output_dir if file_header else None
+    base_output_dir = resolve_output_dir(
+        project_root=project_root,
+        output_template=output_template,
+        collection_name=collection_name,
+        cli_output_dir=args.output_dir,
+        header_output_dir=header_output_dir,
+    )
+    if args.output_dir:
+        output_dir_source = "--output-dir"
+    elif header_output_dir:
+        output_dir_source = ".prompts header output_dir"
+    else:
+        output_dir_source = f"paths.output_template ({output_template})"
 
     # ---- CLI override: --input-image wins over .prompts input_images ----
     if args.input_image:
@@ -395,6 +455,7 @@ def main() -> None:
     if args.style:
         print(f"Style override (OpenAI, metadata only): {args.style}")
     print(f"Total prompts: {len(prompts)}")
+    print(f"Output directory: {base_output_dir}  [{output_dir_source}]")
 
     if args.verbose:
         print("\nPrompts to generate:")
@@ -408,22 +469,7 @@ def main() -> None:
         print("\nDry run — no images will be generated")
         return
 
-    # ---- Resolve base output dir ---- (service-independent)
-    if args.output_dir:
-        base_output_dir: Optional[str] = args.output_dir
-    elif args.collection:
-        base_output_dir = str(
-            project_root / output_template.format(collection=args.collection)
-        )
-    else:
-        # --prompts-file / --prompts-dir: each prompt carries its own
-        # output_path; the generator falls back to it when base is None.
-        base_output_dir = None
-
-    if base_output_dir:
-        print(f"\nGenerating images to: {base_output_dir}")
-    else:
-        print("\nGenerating images (paths from .prompts file output_path)")
+    print(f"\nGenerating images to: {base_output_dir}")
     print("=" * 50)
 
     # ---- Generate, grouped by (service, model) ----
@@ -471,7 +517,7 @@ def main() -> None:
 
         try:
             group_results = generator.generate_batch(
-                group_prompts, base_output_dir, args.images_per_prompt,
+                group_prompts, str(base_output_dir), args.images_per_prompt,
                 **call_kwargs,
             )
         except KeyboardInterrupt:

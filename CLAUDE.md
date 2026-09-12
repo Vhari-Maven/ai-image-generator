@@ -47,10 +47,14 @@ Notes:
 
 Notes on 2.5:
 - Both 2.5 models bill at gpt-image-2's per-token rates (text in $5 /
-  image in $8 / image out $30 per 1M). `xhigh` and `max` are new tiers
-  above `high`; at 1024×1024 OpenAI's calculator puts them at roughly
-  1.8× and 4× the cost of `high`. Passing them to a non-2.5 model is a
-  hard error in `openai_image.py` (`quality_tiers_for`), not a downgrade.
+  image in $8 / image out $30 per 1M), **but the quality tier names were
+  remapped**: 2.5 `high` has the same output-token budget as gpt-image-2
+  `medium`, and 2.5 `max` matches gpt-image-2 `high`. `medium` and
+  `xhigh` on 2.5 are new intermediate tiers. Reproducing an old render
+  by quality *name* gives ~¼ the tokens; match by tier budget instead
+  (see the table in Field notes). Passing `xhigh`/`max` to a non-2.5
+  model is a hard error in `openai_image.py` (`quality_tiers_for`), not
+  a downgrade.
 - `background: "transparent"` is GA on both (PNG/WebP). `opaque` is a
   new explicit value; the generator still only sends `transparent`.
 - Dated snapshots (`gpt-image-2.5-flare-2026-09-08`) are accepted
@@ -145,6 +149,20 @@ Generated images land flat under:
 with `--project-root`. There is no per-type subdirectory routing —
 everything in a collection lands in one directory, named by `filename:`
 in each `.prompts` entry.
+
+All three source modes land in the same place for the same collection:
+`--collection joyco`, `--prompts-file prompts/joyco/x.prompts` and
+`--prompts-dir prompts/joyco` each write to
+`<project_root>/art/joyco/`. The collection name for the file/dir modes
+is the directory name. `--output-dir` and a `.prompts` header
+`output_dir:` override the template and, if relative, also resolve
+against the project root. Relative `--prompts-file` / `--prompts-dir`
+paths are tried under the project root first, then the CWD. Every run
+(including `--dry-run`) prints `Output directory: … [source]` so you can
+see where images will land before spending money. If you run from this
+repo without `--project-root`, the project root *is* this repo and
+output goes to `./art/<collection>/` — pass `--project-root sandbox` for
+scratch work.
 
 ## Invocation
 
@@ -509,6 +527,36 @@ finished. `high` spent ~4× the output tokens of `medium` at the same
 size (1024²: 439 → 1756 tokens, $0.013 → $0.053). Text-heavy work
 (badges, lockups) needs `high`; scenes without small text are usually
 fine at `medium`.
+
+**2.5 quality names ≠ gpt-image-2 quality names.** Output tokens from
+OpenAI's calculator (2026-09-12), verified against `usage` on real
+renders. The token count is deterministic per (model, quality, size).
+
+| Size | gpt-image-2 low / med / high | 2.5 low / med / high / xhigh / max |
+|---|---|---|
+| 1024×1024 | 196 / 1,756 / 7,024 | 196 / 439 / 1,756 / 3,122 / 7,024 |
+| 1024×1536 | 158 / 1,372 / 5,488 | 158 / 343 / 1,372 / 2,459 / 5,488 |
+| 2048×3072 | 365 / 3,184 / 12,736 | 365 / 796 / 3,184 / 5,705 / 12,736 |
+
+So gpt-image-2 `medium` ≡ 2.5 `high` and gpt-image-2 `high` ≡ 2.5
+`max`. An old `high` render at 2048×3072 (12,736 tokens, ~$0.39) is a
+2.5 `max` render, not a 2.5 `high` one (3,184 tokens, ~$0.10). Note
+also that portrait 1024×1536 costs *fewer* tokens than square 1024×1024
+at every tier; the guide says non-square sizes "can sometimes produce
+fewer output tokens". Don't estimate from pixel area.
+
+**Sunburst takes color and lighting words literally.** Compared with
+gpt-image-2 on the same prompt it obeys `LIGHTING:` and adjectives like
+"pastel" or "pink-tinted key light" much more strongly, which flattened
+and desaturated a character set that gpt-image-2 rendered punchy. What
+fixed it: lead with the style constraint, pin key colors with hex values
+(cloth *and* skin base/highlight/shadow), and keep lighting neutral
+unless a tint is actually wanted. It also over-obeys anti-childlike
+face language ("adult bone structure", "eyes at the midline") into a
+visibly older character; state the target age directly ("designed to
+look about 25, youthful anime face") instead. Strict "two-tone cel, no
+gradients" removes skin sheen entirely; ask for three tones plus a
+specular sheen if the reference had one.
 
 **Transparency is a parameter, not a prompt.** `remove_background: true`
 sends `background="transparent"`; the prompt should still say
