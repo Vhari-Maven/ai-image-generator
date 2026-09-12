@@ -7,18 +7,23 @@ behind a single interface.
 
 ## Quick start
 
-From your project root:
+From this repo:
 
 ```bash
-# install deps (one time)
-uv sync --project /path/to/tools/ai_art_generator
+# install deps (one time; includes the bg-removal group)
+uv sync
 
 # verify keys + connectivity (cheap, non-generative probe)
-uv run --project /path/to/tools/ai_art_generator art-generator --test-connection
+uv run art-generator --test-connection
 
-# generate a collection
-uv run --project /path/to/tools/ai_art_generator art-generator --collection my-set
+# generate a collection under a project root (defaults to the current dir)
+uv run art-generator --project-root /path/to/your/project --collection my-set
+
+# or, from a consuming project's root
+uv run --project /path/to/ai-image-generator art-generator --collection my-set
 ```
+
+`sandbox/` is a gitignored project root for trying the tool out here.
 
 Project layout the tool expects (configurable in `config.yaml`):
 
@@ -31,12 +36,13 @@ Project layout the tool expects (configurable in `config.yaml`):
 
 ## API keys
 
-Resolution order: env var → `/run/secrets/<provider>-api-key` → `config.yaml`.
+Resolution order: env var → `/run/secrets/<stem>` → gpg-decrypt
+`~/.secrets-enc/<stem>.gpg` (in memory, needs a gpg-agent) → `config.yaml`.
 
-| Service | Env var | Secret file |
+| Service | Env var | Secret stem |
 |---|---|---|
-| Google GenAI | `GOOGLE_AI_API_KEY` | `/run/secrets/google-api-key` |
-| OpenAI | `OPENAI_API_KEY` | `/run/secrets/openai-api-key` |
+| Google GenAI | `GOOGLE_AI_API_KEY` | `google-api-key` |
+| OpenAI | `OPENAI_API_KEY` | `openai-api-key` |
 
 ## Models
 

@@ -9,9 +9,10 @@ wrapping OpenAI's gpt-image family (`gpt-image-2.5-flare` /
 `gpt-image-2.5-sunburst`, plus `gpt-image-2`, `gpt-image-1.5`,
 `gpt-image-1`) and Google's Gemini image models.
 Project-agnostic: paths are configurable, terminology is neutral
-(`--collection`, not `--story`/`--artifact`). Currently lives in-tree
-under `tools/ai_art_generator/` but designed for clean extraction to
-its own repo.
+(`--collection`, not `--story`/`--artifact`). This is the standalone
+repo (`Vhari-Maven/ai-image-generator`); it grew up in-tree under
+`tools/ai_art_generator/` in digital-haze → realms-reborn → quest, and
+those copies are now downstream of this one.
 
 ## Supported Models (September 2026)
 
@@ -147,44 +148,52 @@ in each `.prompts` entry.
 
 ## Invocation
 
-The tool expects to be run from the consuming project's root directory:
+The tool reads prompts from and writes art to a *project root*, which
+defaults to the current directory. Two ways to run it:
 
 ```bash
+# From a consuming project's root, pointing uv at this repo
 cd /path/to/your/project
-uv run --project /path/to/tools/ai_art_generator art-generator --help
+uv run --project /path/to/ai-image-generator art-generator --help
+
+# From this repo, pointing the tool at a project root
+cd /path/to/ai-image-generator
+uv run art-generator --project-root /path/to/your/project --help
 ```
 
-Or, when in-tree, from this repo's root:
+For testing the tool itself, `sandbox/` in this repo is a gitignored
+project root (see `sandbox/README.md`):
 
 ```bash
-cd /path/to/your/project
-uv run --project tools/ai_art_generator art-generator --help
+uv run art-generator --project-root sandbox --collection <slug> --dry-run
 ```
+
+The examples below use the short in-repo form.
 
 ## Usage Patterns
 
 **Testing connection** (uses a cheap, non-generative `models.list()` probe):
 
 ```bash
-uv run --project tools/ai_art_generator art-generator --test-connection
-uv run --project tools/ai_art_generator art-generator --test-connection --service openai
+uv run art-generator --test-connection
+uv run art-generator --test-connection --service openai
 ```
 
 **Single image:**
 ```bash
-uv run --project tools/ai_art_generator art-generator \
+uv run art-generator \
   --collection my-set --image-id base
 
 # Higher quality with Nano Banana Pro
-uv run --project tools/ai_art_generator art-generator \
+uv run art-generator \
   --collection my-set --image-id base --model gemini-3-pro-image-preview
 
 # OpenAI (default gpt-image-2.5-sunburst)
-uv run --project tools/ai_art_generator art-generator \
+uv run art-generator \
   --collection my-set --image-id base --service openai --quality high
 
 # OpenAI fast iteration
-uv run --project tools/ai_art_generator art-generator \
+uv run art-generator \
   --collection my-set --image-id base --service openai \
   --model gpt-image-2.5-flare --quality medium
 ```
@@ -192,19 +201,19 @@ uv run --project tools/ai_art_generator art-generator \
 **Batch:**
 ```bash
 # Whole collection
-uv run --project tools/ai_art_generator art-generator --collection my-set
+uv run art-generator --collection my-set
 
 # Whole collection with a 16:9 aspect override (GenAI)
-uv run --project tools/ai_art_generator art-generator \
+uv run art-generator \
   --collection my-set --aspect-ratio 16:9
 ```
 
 **Specific file or directory:**
 ```bash
-uv run --project tools/ai_art_generator art-generator \
+uv run art-generator \
   --prompts-file prompts/my-set/base.prompts
 
-uv run --project tools/ai_art_generator art-generator \
+uv run art-generator \
   --prompts-dir prompts/my-set/
 ```
 
@@ -236,7 +245,7 @@ Two ways to specify inputs:
    editing the source `.prompts`:
 
    ```bash
-   uv run --project tools/ai_art_generator art-generator \
+   uv run art-generator \
      --prompts-file prompts/experiments/outfit-swap.prompts \
      --input-image web/public/img/joyco-magazine-ad/jx7-hero.png
    ```
@@ -258,10 +267,10 @@ source that was discarded.
 
 ```sh
 # print to stdout
-uv run --project tools/ai_art_generator prompts-from-image <image.png>
+uv run prompts-from-image <image.png>
 
 # write to a file
-uv run --project tools/ai_art_generator prompts-from-image <image.png> \
+uv run prompts-from-image <image.png> \
   -o prompts/<collection>/characters/<name>.prompts
 ```
 
@@ -284,11 +293,13 @@ Dev: `pytest`, `black`, `ruff`.
 ## File Structure
 
 ```
-tools/ai_art_generator/
+ai-image-generator/
 ├── .venv/                   # venv (gitignored)
+├── sandbox/                 # gitignored project root for local testing
 ├── art_generator.py         # CLI entry point
 ├── prompts_from_image.py    # reverse-direction CLI (image → .prompts)
-├── config.py                # Config loader (with /run/secrets/ fallback)
+├── backup.py                # <output_dir>/drafts/ backups before overwrite
+├── config.py                # Config loader (env → /run/secrets → gpg → yaml)
 ├── config.yaml              # Runtime config (gitignored)
 ├── config.yaml.example
 ├── pricing.py               # Per-model token rates → per-image cost lookup
@@ -305,8 +316,9 @@ tools/ai_art_generator/
 │   ├── stages.py            # Concrete stage wrappers (RemoveBackgroundStage)
 │   ├── remove_bg.py         # rembg + chroma-key knockout/spill/dead-pixel/trim
 │   └── remove_bg_cli.py     # `art-generator-remove-bg` standalone CLI (single + batch)
-└── prompts/
-    └── parser.py            # `.prompts` file format spec + parser
+├── prompts/
+│   └── parser.py            # `.prompts` file format spec + parser
+└── tests/                   # pytest; `uv run pytest -q tests`
 ```
 
 ### Subclass contract for new generators
@@ -420,9 +432,8 @@ parameters in `config.yaml` and re-processing a whole collection.
 
 **Dependency group.** `rembg` and friends live in the `bg-removal`
 dependency group (PEP 735), listed under `[tool.uv.default-groups]` so
-in-tree `uv sync` installs them automatically. They are NOT included
-when this tool is consumed as a library from another project — keeps
-the extraction footprint clean. If a user removes the group manually
+a plain `uv sync` in this repo installs them automatically. They are NOT
+included when this tool is consumed as a library from another project. If a user removes the group manually
 and then triggers bg removal, they get a friendly `BgRemovalNotInstalled`
 message with the install command.
 
@@ -435,10 +446,10 @@ message with the install command.
 (try `gpg --batch -q -d` on it by hand; a pinentry prompt means no agent),
 or `config.yaml`.
 
-**"Connection refused" / "Connection error":** the devcontainer firewall
-allowlist must include `api.openai.com` and `generativelanguage.googleapis.com`
-— see [.devcontainer/firewall-extra](../../.devcontainer/firewall-extra)
-(applied by the base image's init-firewall.sh on container start).
+**"Connection refused" / "Connection error":** if running inside a
+firewalled devcontainer, its allowlist must include `api.openai.com`,
+`generativelanguage.googleapis.com`, and (for rembg model downloads)
+GitHub release hosts. See the consuming project's `.devcontainer/`.
 
 **Import errors with Google SDK:** use `google-genai` (not `google-generativeai`);
 import as `from google import genai`.
@@ -457,9 +468,11 @@ import as `from google import genai`.
 
 ## Running from Claude Code
 
-Real generation calls take real time — gpt-image-2 at high quality was ~110s
-for a single 1536×1024 in observed runs, batches scale roughly linearly within
-the per-service thread limit. **Always run actual generation calls with
+Real generation calls take real time. Observed on 2026-09-11 (single
+image, edit path adds a few seconds): gpt-image-2.5-flare 15–25s at
+medium/high; gpt-image-2.5-sunburst 20–50s, ~1.5–2× flare; gpt-image-2
+30–40s. Batches run up to 5 wide on OpenAI and scale roughly linearly
+beyond that. **Always run actual generation calls with
 `run_in_background: true`** and continue the conversation while they finish;
 Claude Code will be notified on completion. Foreground-blocking on a
 multi-image batch wastes the user's session.
@@ -485,12 +498,51 @@ each generation; just run the real generation in the background. Only
 reach for dry-run when the tool's plumbing has changed and you want to
 verify the new resolution behavior before spending money.
 
-## Extraction-readiness
+## Field notes (observed 2026-09-11, gpt-image-2.5 launch week)
 
-The tool has no project-specific terminology or hardcoded paths in source.
-To extract to its own repo:
+Things learned from real runs that the API docs don't tell you.
 
-1. `git filter-repo --path tools/ai_art_generator/ --path-rename tools/ai_art_generator/:`
-2. Add a top-level README, LICENSE, `.gitignore`
-3. Consume from digital-haze (or any other project) via `uv add` from path or git URL
-4. Delete the in-tree copy
+**Cost is driven by quality × size, not by model.** Flare and sunburst
+returned byte-identical token counts on every paired render (six pairs),
+so they cost the same; sunburst is just slower and a little more
+finished. `high` spent ~4× the output tokens of `medium` at the same
+size (1024²: 439 → 1756 tokens, $0.013 → $0.053). Text-heavy work
+(badges, lockups) needs `high`; scenes without small text are usually
+fine at `medium`.
+
+**Transparency is a parameter, not a prompt.** `remove_background: true`
+sends `background="transparent"`; the prompt should still say
+"isolated subject, no ground shadow, no background" so nothing gets
+baked into the opaque region. gpt-image-2 has no such parameter and,
+asked for "no background", paints a fake grey/white checkerboard in an
+RGB image — the local rembg pipeline handles that case. On 2.5 the
+returned alpha tops out at ~254 (subject ≈1% translucent); harmless
+for most uses. Never set the flag on a full scene: the API returns a
+uniformly semi-transparent image. Per-entry `remove_background: false`
+opts a scene out of a header-level `true`.
+
+**Reference images work well through `images.edit`.** A UI screenshot
+containing several vehicles yielded scenes with exactly the named
+subjects, faithful colors/markings, and no interface or text leakage,
+across painterly / cel / low-poly styles. Name the subjects by their
+distinguishing features in the prompt and end with an explicit
+"no interface, cards, icons, text, letters, numbers or logos" line. The
+reference costs ~1,150 input tokens per call.
+
+**Open briefs converge.** Given full creative freedom on an Air Force /
+Space Force mark, flare and sunburst independently produced the same
+concept (delta/jet + orbit ring + globe, navy/steel). For a spread of
+directions, use `-n 3` or steer the brief; one roll per prompt won't
+show variety.
+
+**Don't write negative prompts for things the model hasn't seen.**
+Listing motifs to avoid (from a reference the model never received)
+both wastes tokens and can nudge the model toward them. State the
+positive register instead; keep only constraints that are properties
+of the result ("must not be mistakable for an official seal").
+
+**Known gap:** `image_input_tokens` in PNG metadata is unset on the
+edit path because the SDK's usage object didn't expose the
+text/image split as expected, so reference-image tokens are priced at
+the text rate (~$0.003/image undercount). See `_extract_usage` in
+`generators/openai_image.py`.
