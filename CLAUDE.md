@@ -276,6 +276,13 @@ Order is positionally significant.
 When `input_images` is empty (default), behavior is unchanged: text→image
 generation as before.
 
+Transparent references are cleaned before upload (OpenAI): RGB under fully
+transparent pixels is zeroed. Cut-out renders keep a faint coloured glow
+there, invisible but read by the model, and references carrying it came
+back with a dark half-transparent backdrop the native background removal
+couldn't cut away (observed 2026-10-03, gpt-image-2.5-sunburst; the same
+references cleaned came back clean). Opaque references are sent as-is.
+
 ## Reverse direction: image → .prompts
 
 `prompts-from-image` reads an image's embedded PNG metadata (the same fields

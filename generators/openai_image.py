@@ -295,8 +295,38 @@ class OpenAIImageGenerator(BaseGenerator):
                     f"input_images path not found: {p} "
                     f"(from prompt '{prompt.id}')"
                 )
-            opened.append(open(p, "rb"))
+            opened.append(self._reference_file(p))
         return opened
+
+    @staticmethod
+    def _reference_file(path: Path) -> Any:
+        """Open a reference image for upload, cleaning hidden colour first.
+
+        A transparent PNG keeps RGB under its fully transparent pixels, and
+        renders cut out by this API carry a faint coloured glow there. The
+        model reads it: references with that glow came back with a dark,
+        half-transparent backdrop the API could not cut away, and the same
+        references with it cleared came back cleanly cut. So any image with
+        an alpha channel is sent with RGB zeroed wherever alpha is 0;
+        anything else goes as the file on disk. The result is a file-like
+        object named like the source (the SDK uses the name for the upload).
+        """
+        with Image.open(path) as im:
+            has_alpha = im.mode in ("RGBA", "LA", "PA") or (
+                im.mode == "P" and "transparency" in im.info
+            )
+            if not has_alpha:
+                return open(path, "rb")
+            rgba = im.convert("RGBA")
+        # Copy every pixel with any alpha onto transparent black.
+        visible = rgba.getchannel("A").point(lambda a: 255 if a else 0)
+        clean = Image.new("RGBA", rgba.size, (0, 0, 0, 0))
+        clean.paste(rgba, (0, 0), visible)
+        buf = BytesIO()
+        clean.save(buf, format="PNG")
+        buf.seek(0)
+        buf.name = path.with_suffix(".png").name
+        return buf
 
     def _image_from_response(self, image_data: Any) -> Image.Image:
         if image_data.b64_json:
