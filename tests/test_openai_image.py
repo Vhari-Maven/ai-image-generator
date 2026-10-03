@@ -7,6 +7,7 @@ SDK allows without making any call.
 from __future__ import annotations
 
 import pytest
+from PIL import Image
 
 from generators.openai_image import (
     OpenAIImageGenerator,
@@ -86,3 +87,31 @@ class TestRequestAssembly:
         prompt.id = "x"
         with pytest.raises(ValueError, match="not supported by gpt-image-2"):
             gen.generate_image(prompt, str(tmp_path), quality="max")
+
+
+class TestReferenceImages:
+    def test_hidden_colour_under_transparency_is_cleared(self, tmp_path):
+        # A cut-out render: an opaque pixel, a half-transparent edge pixel,
+        # and colour left under a fully transparent one.
+        im = Image.new("RGBA", (3, 1))
+        im.putpixel((0, 0), (200, 40, 160, 255))
+        im.putpixel((1, 0), (90, 80, 70, 128))
+        im.putpixel((2, 0), (180, 60, 200, 0))
+        path = tmp_path / "ref.png"
+        im.save(path)
+
+        sent = OpenAIImageGenerator._reference_file(path)
+        assert sent.name == "ref.png"
+        out = Image.open(sent)
+        assert out.getpixel((0, 0)) == (200, 40, 160, 255)
+        assert out.getpixel((1, 0)) == (90, 80, 70, 128)
+        assert out.getpixel((2, 0)) == (0, 0, 0, 0)
+
+    def test_opaque_image_is_sent_as_the_file(self, tmp_path):
+        path = tmp_path / "ref.jpg"
+        Image.new("RGB", (2, 2), (10, 20, 30)).save(path)
+        sent = OpenAIImageGenerator._reference_file(path)
+        try:
+            assert sent.read() == path.read_bytes()
+        finally:
+            sent.close()
