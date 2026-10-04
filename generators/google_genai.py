@@ -191,9 +191,7 @@ class GoogleGenAIGenerator(BaseGenerator):
         paths = getattr(prompt, "input_images", None) or []
         loaded: List[Image.Image] = []
         for raw in paths:
-            p = Path(raw)
-            if not p.is_absolute():
-                p = Path.cwd() / p
+            p = self.config.resolve_reference(raw)
             if not p.exists():
                 raise FileNotFoundError(
                     f"input_images path not found: {p} "

@@ -138,6 +138,14 @@ The tool reads `paths.prompts_dir` and `paths.output_template` from
 `art/{collection}/`. A `config.yaml` is only needed for
 machine-specific overrides.
 
+`ART_OUTPUT_TEMPLATE` overrides `paths.output_template` from the
+environment, e.g. `/mnt/project-files/art/{collection}` in a Claude Code
+cloud session, where the repo's `art/` is wiped with the container. Backups
+in `drafts/` follow the renders. A relative `input_images` path that isn't
+found under the project root, and starts with the config.yaml template's
+base (`art/`), is then looked up under the override's base, so prompts that
+reference earlier renders work unchanged.
+
 For each `--collection <slug>`, prompts are read from any `.prompts`
 file at any depth under:
 

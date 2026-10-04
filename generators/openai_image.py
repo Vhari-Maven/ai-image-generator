@@ -281,9 +281,7 @@ class OpenAIImageGenerator(BaseGenerator):
         paths = getattr(prompt, "input_images", None) or []
         opened: List[Any] = []
         for raw in paths:
-            p = Path(raw)
-            if not p.is_absolute():
-                p = Path.cwd() / p
+            p = self.config.resolve_reference(raw)
             if not p.exists():
                 # Close anything we already opened before raising.
                 for fh in opened:

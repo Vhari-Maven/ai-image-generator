@@ -27,6 +27,11 @@ _API_KEY_SOURCES = {
 # Override with ART_SECRETS_ENC_DIR or `api.secrets_enc_dir` in config.yaml.
 _DEFAULT_SECRETS_ENC_DIR = "~/.secrets-enc"
 
+# Environment variables that override config.yaml (dotted key → env var).
+_ENV_OVERRIDES = {
+    "paths.output_template": "ART_OUTPUT_TEMPLATE",
+}
+
 # In Claude Code cloud sessions the outbound proxy adds the real key to each
 # request, so the container never holds it. The SDKs still refuse to start
 # without one, so they get this stand-in, which the proxy replaces.
@@ -64,6 +69,49 @@ class Config:
             Path(config_path) if config_path else self.config_dir / "config.yaml"
         )
         self.config = self._load_config()
+        # The template before any env override: `input_images` paths in
+        # .prompts files are written against it.
+        self.file_output_template: str = self.get(
+            "paths.output_template", "art/{collection}"
+        )
+        self._apply_env_overrides()
+
+    def _apply_env_overrides(self) -> None:
+        for key, env_var in _ENV_OVERRIDES.items():
+            value = os.getenv(env_var)
+            if not value:
+                continue
+            *parents, leaf = key.split(".")
+            node = self.config
+            for part in parents:
+                node = node.setdefault(part, {})
+            node[leaf] = value
+
+    def resolve_reference(self, raw: str) -> Path:
+        """Resolve an `input_images` path.
+
+        Absolute paths are used verbatim; relative ones resolve against the
+        CWD (the consuming project's root). When ART_OUTPUT_TEMPLATE moves
+        renders elsewhere, a relative path that isn't found there and starts
+        with the config.yaml template's base (`art/` by default) is looked
+        up under the override's base instead, so prompts that reference
+        earlier renders keep working.
+        """
+        path = Path(raw)
+        if path.is_absolute():
+            return path
+        local = Path.cwd() / path
+        if local.exists():
+            return local
+        file_base = self.file_output_template.split("{collection}")[0]
+        live_base = self.get("paths.output_template", "").split("{collection}")[0]
+        if file_base and live_base != file_base and raw.startswith(file_base):
+            moved = Path(live_base) / raw[len(file_base):]
+            if not moved.is_absolute():
+                moved = Path.cwd() / moved
+            if moved.exists():
+                return moved
+        return local
 
     def _load_config(self) -> Dict[str, Any]:
         defaults = self._get_default_config()
