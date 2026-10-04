@@ -11,7 +11,8 @@ from config import Config
 
 @pytest.fixture
 def cfg(tmp_path, monkeypatch):
-    for v in ("OPENAI_API_KEY", "GOOGLE_AI_API_KEY", "ART_SECRETS_ENC_DIR"):
+    for v in ("OPENAI_API_KEY", "GOOGLE_AI_API_KEY", "ART_SECRETS_ENC_DIR",
+              "CLAUDE_CODE_REMOTE"):
         monkeypatch.delenv(v, raising=False)
     (tmp_path / "config.yaml").write_text("api: {}\n")
     return Config(str(tmp_path / "config.yaml"))
@@ -57,6 +58,18 @@ def test_gpg_failure_falls_through_to_config(cfg, tmp_path, monkeypatch):
 def test_missing_gpg_file_is_silent(cfg, tmp_path, monkeypatch):
     monkeypatch.setenv("ART_SECRETS_ENC_DIR", str(tmp_path / "nope"))
     assert cfg.get_api_key("openai") is None
+
+
+def test_cloud_session_gets_placeholder(cfg, tmp_path, monkeypatch):
+    monkeypatch.setenv("ART_SECRETS_ENC_DIR", str(tmp_path / "nope"))
+    monkeypatch.setenv("CLAUDE_CODE_REMOTE", "true")
+    assert cfg.get_api_key("openai") == config_mod._INJECTED_KEY_PLACEHOLDER
+
+
+def test_real_key_beats_cloud_placeholder(cfg, monkeypatch):
+    monkeypatch.setenv("CLAUDE_CODE_REMOTE", "true")
+    monkeypatch.setenv("OPENAI_API_KEY", "from-env")
+    assert cfg.get_api_key("openai") == "from-env"
 
 
 def test_default_service_is_openai(tmp_path):

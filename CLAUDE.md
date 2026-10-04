@@ -119,6 +119,12 @@ Resolution order in `config.get_api_key()`:
    reachable gpg-agent; nothing is written to disk). Directory overridable
    with `ART_SECRETS_ENC_DIR` or `api.secrets_enc_dir` in `config.yaml`.
 4. **`config.yaml`** — `api.google_ai_key` / `api.openai_key`
+5. **Claude Code cloud placeholder** — when `CLAUDE_CODE_REMOTE=true` and
+   nothing above gave a key, a stand-in value. The cloud environment stores
+   the real key as a credential that its proxy adds to requests for
+   `api.openai.com` (`Authorization: Bearer`) or
+   `generativelanguage.googleapis.com` (`x-goog-api-key`), so the container
+   never holds it. A missing credential shows up as a 401/403 from the API.
 
 Devcontainers decrypt the same `~/.secrets-enc/` files into podman secrets
 mounted at `/run/secrets/` (see the consuming project's

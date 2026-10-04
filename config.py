@@ -27,6 +27,11 @@ _API_KEY_SOURCES = {
 # Override with ART_SECRETS_ENC_DIR or `api.secrets_enc_dir` in config.yaml.
 _DEFAULT_SECRETS_ENC_DIR = "~/.secrets-enc"
 
+# In Claude Code cloud sessions the outbound proxy adds the real key to each
+# request, so the container never holds it. The SDKs still refuse to start
+# without one, so they get this stand-in, which the proxy replaces.
+_INJECTED_KEY_PLACEHOLDER = "injected-by-proxy"
+
 
 def _decrypt_gpg_secret(path: Path) -> Optional[str]:
     """Decrypt `path` with gpg, in memory, never prompting.
@@ -149,7 +154,9 @@ class Config:
         """Resolve the API key for a service.
 
         Order: env var → /run/secrets/<stem> (devcontainer bind)
-        → gpg-decrypt <secrets_enc_dir>/<stem>.gpg → config.yaml.
+        → gpg-decrypt <secrets_enc_dir>/<stem>.gpg → config.yaml
+        → a placeholder in Claude Code cloud sessions, whose proxy
+        injects the real key.
         """
         if service not in _API_KEY_SOURCES:
             return None
@@ -179,7 +186,13 @@ class Config:
         if value:
             return value
 
-        return self.get(config_key)
+        value = self.get(config_key)
+        if value:
+            return value
+
+        if os.getenv("CLAUDE_CODE_REMOTE") == "true":
+            return _INJECTED_KEY_PLACEHOLDER
+        return None
 
 
 # Singleton. Re-instantiated only when the caller passes an explicit
