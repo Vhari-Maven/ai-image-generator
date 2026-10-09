@@ -72,6 +72,12 @@ openai:
     quality: "auto"
     style: "natural"
 
+  # Stream each request with this many partial images before the final one
+  # (0 turns streaming off). Defaults to 1 in a Claude Code cloud session,
+  # whose proxy drops responses that take over ~30 s to start, and 0
+  # elsewhere. Each partial adds ~100 output tokens.
+  # partial_images: 0
+
 # Post-processing run after image generation. Each step is opt-in via the
 # .prompts header field of the same name (e.g. `remove_background: true`).
 # All tunables live here — there are no CLI flags for these knobs, by design,
