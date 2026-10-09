@@ -89,6 +89,48 @@ class TestRequestAssembly:
             gen.generate_image(prompt, str(tmp_path), quality="max")
 
 
+class _Event:
+    def __init__(self, type, **kw):
+        self.type = type
+        self.__dict__.update(kw)
+
+
+class TestStreaming:
+    def test_off_outside_the_cloud(self, gen, monkeypatch):
+        monkeypatch.delenv("CLAUDE_CODE_REMOTE", raising=False)
+        calls = []
+        gen._request(lambda **kw: calls.append(kw) or "plain", {"n": 1})
+        assert calls == [{"n": 1}]
+
+    def test_cloud_streams_and_returns_completed_image(self, gen, monkeypatch):
+        monkeypatch.setenv("CLAUDE_CODE_REMOTE", "true")
+        calls = []
+
+        def call(**kw):
+            calls.append(kw)
+            return iter([
+                _Event("image_generation.partial_image", b64_json="part"),
+                _Event("image_generation.completed", b64_json="full",
+                       usage="u"),
+            ])
+
+        response = gen._request(call, {"n": 1})
+        assert calls == [{"n": 1, "stream": True, "partial_images": 1}]
+        assert response.data[0].b64_json == "full"
+        assert response.usage == "u"
+
+    def test_several_images_are_not_streamed(self, gen, monkeypatch):
+        monkeypatch.setenv("CLAUDE_CODE_REMOTE", "true")
+        calls = []
+        gen._request(lambda **kw: calls.append(kw), {"n": 2})
+        assert calls == [{"n": 2}]
+
+    def test_stream_without_completed_image_fails(self, gen, monkeypatch):
+        monkeypatch.setenv("CLAUDE_CODE_REMOTE", "true")
+        with pytest.raises(RuntimeError):
+            gen._request(lambda **kw: iter([]), {"n": 1})
+
+
 class TestReferenceImages:
     def test_hidden_colour_under_transparency_is_cleared(self, tmp_path):
         # A cut-out render: an opaque pixel, a half-transparent edge pixel,

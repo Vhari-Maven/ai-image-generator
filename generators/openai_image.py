@@ -11,6 +11,7 @@ import base64
 import os
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
 from PIL import Image
@@ -163,11 +164,13 @@ class OpenAIImageGenerator(BaseGenerator):
                     f"→ images.edit"
                 )
                 response, elapsed = self._timed_call(
-                    lambda: self.client.images.edit(**api_params)
+                    lambda: self._request(self.client.images.edit, api_params)
                 )
             else:
                 response, elapsed = self._timed_call(
-                    lambda: self.client.images.generate(**api_params)
+                    lambda: self._request(
+                        self.client.images.generate, api_params
+                    )
                 )
         finally:
             for fh in input_image_files:
@@ -270,6 +273,43 @@ class OpenAIImageGenerator(BaseGenerator):
         api_params["output_format"] = "png"
         print(f"  Using native transparent background ({self.model_name})")
         return True
+
+    def _partial_images(self) -> int:
+        """How many partial images to stream before the final one.
+
+        The egress proxy of a Claude Code cloud session drops any request
+        whose response hasn't started within about 30 seconds, answering
+        502 "upstream request failed" (observed 2026-10-09). Sunburst at
+        `high` on a long prompt takes longer than that, so in the cloud the
+        request streams instead: the first partial image starts the response
+        well inside the limit. Each partial adds about 100 output tokens.
+        `openai.partial_images` in config.yaml overrides the default of 1
+        in the cloud and 0 (no streaming) elsewhere.
+        """
+        configured = self.config.get("openai.partial_images")
+        if configured is not None:
+            return int(configured)
+        return 1 if os.getenv("CLAUDE_CODE_REMOTE") == "true" else 0
+
+    def _request(self, call: Any, api_params: Dict[str, Any]) -> Any:
+        """Make the Images API call, streamed when partial images are on.
+
+        A streamed call returns the `completed` event's image and usage in
+        the shape of a plain response, so the rest of the save path is the
+        same either way. Streaming returns one image, so `n` above 1 goes
+        unstreamed.
+        """
+        partials = self._partial_images()
+        if partials <= 0 or api_params.get("n", 1) != 1:
+            return call(**api_params)
+        stream = call(**api_params, stream=True, partial_images=partials)
+        for event in stream:
+            if event.type.endswith(".completed"):
+                return SimpleNamespace(
+                    data=[SimpleNamespace(b64_json=event.b64_json, url=None)],
+                    usage=getattr(event, "usage", None),
+                )
+        raise RuntimeError("Image stream ended without a completed image")
 
     def _open_input_images(self, prompt: ArtPrompt) -> List[Any]:
         """Open every `prompt.input_images` path as a binary file handle.

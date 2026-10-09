@@ -125,6 +125,11 @@ Resolution order in `config.get_api_key()`:
    `api.openai.com` (`Authorization: Bearer`) or
    `generativelanguage.googleapis.com` (`x-goog-api-key`), so the container
    never holds it. A missing credential shows up as a 401/403 from the API.
+   That proxy also drops any response that hasn't started within about 30
+   seconds, with a 502 "upstream request failed" (sunburst at `high` on a
+   long prompt runs longer). So in the cloud OpenAI requests stream with one
+   partial image (`openai.partial_images`, ~100 extra output tokens), which
+   starts the response early.
 
 Devcontainers decrypt the same `~/.secrets-enc/` files into podman secrets
 mounted at `/run/secrets/` (see the consuming project's
