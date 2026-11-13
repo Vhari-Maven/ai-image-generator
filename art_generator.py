@@ -143,8 +143,9 @@ Examples:
                            "the output template all resolve relative to it.")
     misc.add_argument("--output-dir",
                       help="Override output directory (else paths.output_template "
-                           "under the project root). Relative paths resolve "
-                           "against the project root.")
+                           "under the output root). Relative paths resolve "
+                           "against the output root: the project root unless "
+                           "paths.output_root / ART_OUTPUT_ROOT says otherwise.")
     misc.add_argument("--dry-run", action="store_true",
                       help="Resolve prompts and print plan; do not call the API")
     misc.add_argument("--verbose", "-v", action="store_true",
@@ -181,20 +182,23 @@ def resolve_output_dir(
     collection_name: str,
     cli_output_dir: Optional[str] = None,
     header_output_dir: Optional[str] = None,
+    output_root: Optional[Path] = None,
 ) -> Path:
     """Single source of truth for where generated images land.
 
     Precedence: --output-dir > .prompts header `output_dir` > the
     `paths.output_template` formatted with the collection name. Every
-    branch is anchored at `project_root` unless given an absolute path, so
-    the three source modes (--collection / --prompts-file / --prompts-dir)
-    all land in the same place for the same collection.
+    branch is anchored at `output_root` (`paths.output_root`; the project
+    root unless set) unless given an absolute path, so the three source
+    modes (--collection / --prompts-file / --prompts-dir) all land in the
+    same place for the same collection.
     """
+    root = output_root or project_root
     chosen = cli_output_dir or header_output_dir
     if chosen:
         path = Path(chosen)
-        return path if path.is_absolute() else project_root / path
-    return project_root / output_template.format(collection=collection_name)
+        return path if path.is_absolute() else root / path
+    return root / output_template.format(collection=collection_name)
 
 
 def parse_prompts_from_source(
@@ -337,7 +341,11 @@ def main() -> None:
     parser = _build_parser(default_service)
     args = parser.parse_args()
 
-    project_root = Path(args.project_root) if args.project_root else Path.cwd()
+    project_root = (
+        Path(args.project_root).resolve() if args.project_root else Path.cwd()
+    )
+    output_root, output_root_label = config.resolve_output_root(project_root)
+    config.set_roots(project_root, output_root)
     prompts_dir = config.get("paths.prompts_dir", "prompts")
     output_template = config.get(
         "paths.output_template", "art/{collection}"
@@ -395,6 +403,7 @@ def main() -> None:
         collection_name=collection_name,
         cli_output_dir=args.output_dir,
         header_output_dir=header_output_dir,
+        output_root=output_root,
     )
     if args.output_dir:
         output_dir_source = "--output-dir"
@@ -455,6 +464,8 @@ def main() -> None:
     if args.style:
         print(f"Style override (OpenAI, metadata only): {args.style}")
     print(f"Total prompts: {len(prompts)}")
+    if output_root_label != "project root":
+        output_dir_source += f"; {output_root_label}"
     print(f"Output directory: {base_output_dir}  [{output_dir_source}]")
 
     if args.verbose:

@@ -183,6 +183,26 @@ repo without `--project-root`, the project root *is* this repo and
 output goes to `./art/<collection>/` — pass `--project-root sandbox` for
 scratch work.
 
+### Git worktrees: `paths.output_root`
+
+Relative output paths (the template, a header `output_dir`,
+`--output-dir`) are anchored at the *output root*, set by
+`paths.output_root` or env `ART_OUTPUT_ROOT`:
+
+- `project` (default): the project root, as before.
+- `main-checkout`: the main checkout of the project root's git repo
+  (`git rev-parse --git-common-dir`, minus `.git`). From a linked worktree
+  renders and their `drafts/` backups land in the main checkout and
+  outlive the worktree. Outside git, or in a bare repo, it falls back to
+  the project root and says so.
+- any other value: that folder (relative → under the project root).
+
+`input_images` relative paths are looked up under the project root first
+(a worktree's own copy wins), then the output root, then the
+`ART_OUTPUT_TEMPLATE` base as above. They resolve against `--project-root`
+when given, not the CWD. `art-generator-remove-bg --collection` uses the
+same output root. The `Output directory:` line names the setting.
+
 ## Invocation
 
 The tool reads prompts from and writes art to a *project root*, which
