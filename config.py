@@ -5,7 +5,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import yaml
 
@@ -30,7 +30,39 @@ _DEFAULT_SECRETS_ENC_DIR = "~/.secrets-enc"
 # Environment variables that override config.yaml (dotted key → env var).
 _ENV_OVERRIDES = {
     "paths.output_template": "ART_OUTPUT_TEMPLATE",
+    "paths.output_root": "ART_OUTPUT_ROOT",
 }
+
+# `paths.output_root` values. Anything else is a folder path.
+OUTPUT_ROOT_PROJECT = "project"
+OUTPUT_ROOT_MAIN_CHECKOUT = "main-checkout"
+
+
+def main_checkout(path: Path) -> Optional[Path]:
+    """The main working tree of the git repo that holds `path`.
+
+    For a linked worktree (`git worktree add`) this is the checkout the
+    worktree was made from; for the main checkout it is that checkout's
+    root. None when `path` isn't in a git repo, git is missing, or the
+    repo is bare (no main working tree).
+    """
+    if shutil.which("git") is None:
+        return None
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "--path-format=absolute",
+             "--git-common-dir"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0 or not out.stdout.strip():
+        return None
+    common = Path(out.stdout.strip())
+    # A non-bare repo keeps its shared git dir at <main checkout>/.git.
+    if common.name != ".git":
+        return None
+    return common.parent
 
 # In Claude Code cloud sessions the outbound proxy adds the real key to each
 # request, so the container never holds it. The SDKs still refuse to start
@@ -75,6 +107,45 @@ class Config:
             "paths.output_template", "art/{collection}"
         )
         self._apply_env_overrides()
+        # Set by `set_roots` once the CLI knows them; until then both are
+        # the CWD, which is the CLI's default project root.
+        self.project_root: Optional[Path] = None
+        self.output_root: Optional[Path] = None
+
+    def resolve_output_root(self, project_root: Path) -> Tuple[Path, str]:
+        """Where relative output paths are anchored, and why.
+
+        `paths.output_root` (env ART_OUTPUT_ROOT):
+        - `project` (default): the project root, as before.
+        - `main-checkout`: the main checkout of the project root's git
+          repo, so renders and their `drafts/` backups made from a linked
+          worktree outlive it. Falls back to the project root, with a
+          note, outside a git repo.
+        - any other value: that folder (relative → under the project root).
+
+        Returns (root, label) where label says how it was chosen.
+        """
+        setting = str(self.get("paths.output_root") or OUTPUT_ROOT_PROJECT)
+        source = "ART_OUTPUT_ROOT" if os.getenv("ART_OUTPUT_ROOT") else "paths.output_root"
+        if setting == OUTPUT_ROOT_PROJECT:
+            return project_root, "project root"
+        if setting == OUTPUT_ROOT_MAIN_CHECKOUT:
+            main = main_checkout(project_root)
+            if main is None:
+                return project_root, (
+                    f"{source}: {setting} → not a git checkout, "
+                    f"using the project root"
+                )
+            return main, f"{source}: {setting} → {main}"
+        root = Path(setting).expanduser()
+        if not root.is_absolute():
+            root = project_root / root
+        return root, f"{source}: {root}"
+
+    def set_roots(self, project_root: Path, output_root: Path) -> None:
+        """Record the run's project and output roots for `resolve_reference`."""
+        self.project_root = Path(project_root)
+        self.output_root = Path(output_root)
 
     def _apply_env_overrides(self) -> None:
         for key, env_var in _ENV_OVERRIDES.items():
@@ -90,25 +161,32 @@ class Config:
     def resolve_reference(self, raw: str) -> Path:
         """Resolve an `input_images` path.
 
-        Absolute paths are used verbatim; relative ones resolve against the
-        CWD (the consuming project's root). When ART_OUTPUT_TEMPLATE moves
-        renders elsewhere, a relative path that isn't found there and starts
-        with the config.yaml template's base (`art/` by default) is looked
-        up under the override's base instead, so prompts that reference
-        earlier renders keep working.
+        Absolute paths are used verbatim. A relative one is looked up, in
+        order, under:
+        1. the project root (so a worktree's own copy of a file wins);
+        2. the output root, when `paths.output_root` moved it (so renders
+           kept in the main checkout are found from a worktree);
+        3. ART_OUTPUT_TEMPLATE's base, when the path starts with the
+           config.yaml template's base (`art/` by default), so prompts that
+           reference earlier renders keep working after a move.
+        When none exists, the project-root path is returned for the error.
         """
         path = Path(raw)
         if path.is_absolute():
             return path
-        local = Path.cwd() / path
+        project_root = self.project_root or Path.cwd()
+        output_root = self.output_root or project_root
+        local = project_root / path
         if local.exists():
             return local
+        if output_root != project_root and (output_root / path).exists():
+            return output_root / path
         file_base = self.file_output_template.split("{collection}")[0]
         live_base = self.get("paths.output_template", "").split("{collection}")[0]
         if file_base and live_base != file_base and raw.startswith(file_base):
             moved = Path(live_base) / raw[len(file_base):]
             if not moved.is_absolute():
-                moved = Path.cwd() / moved
+                moved = output_root / moved
             if moved.exists():
                 return moved
         return local
@@ -138,6 +216,7 @@ class Config:
             "paths": {
                 "prompts_dir": "prompts",
                 "output_template": "art/{collection}",
+                "output_root": OUTPUT_ROOT_PROJECT,
             },
             "generation": {
                 "images_per_prompt": 1,

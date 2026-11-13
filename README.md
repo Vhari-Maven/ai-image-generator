@@ -86,11 +86,28 @@ Copy `config.yaml.example` to `config.yaml` and customize. Key settings:
 - `paths.prompts_dir` — where collections live (default: `prompts`)
 - `paths.output_template` — output base, with `{collection}` placeholder
   (default: `art/{collection}`)
+- `paths.output_root` — folder relative output paths are anchored at:
+  `project` (default), `main-checkout`, or a path; env `ART_OUTPUT_ROOT`
+  overrides (see below)
 - `genai.model` / `openai.model` — default model per service
 - `genai.defaults.aspect_ratio`, `openai.defaults.{size,quality,style}` —
   per-service defaults (used when nothing else supplies a value)
 - `postprocess.remove_background.*` — bg-removal tunables (no CLI flags
   by design; see [CLAUDE.md](CLAUDE.md#post-processing))
+
+## Running from a git worktree
+
+The tool doesn't need to be inside the project: run it from a linked
+worktree with `uv run --project /path/to/ai-image-generator art-generator
+...`, and prompts come from the worktree. Renders, though, land in the
+worktree's `art/` and are lost when it's removed, `drafts/` backups with
+them. Set `paths.output_root: main-checkout` in the tool's `config.yaml`
+(or `ART_OUTPUT_ROOT=main-checkout`) and they go to the main checkout of
+the project's repo instead, from any worktree. A relative `input_images`
+path is looked up in the worktree first, then in the main checkout, so
+references to earlier renders still resolve. From the main checkout
+itself, or outside git, nothing changes. Every run prints where output
+goes and why.
 
 ## See also
 

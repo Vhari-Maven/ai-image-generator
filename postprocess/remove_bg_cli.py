@@ -88,8 +88,11 @@ def _resolve_target(args, config) -> List[Path]:
         output_template = config.get(
             "paths.output_template", "art/{collection}"
         )
-        # Project root: CWD by convention (matches main CLI's default).
-        collection_dir = Path.cwd() / output_template.format(
+        # Project root: CWD by convention (matches main CLI's default);
+        # paths.output_root may move the output elsewhere (e.g. the main
+        # checkout when run from a git worktree).
+        output_root, _ = config.resolve_output_root(Path.cwd())
+        collection_dir = output_root / output_template.format(
             collection=args.collection
         )
         if not collection_dir.exists():

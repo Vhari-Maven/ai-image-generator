@@ -12,6 +12,17 @@ paths:
   # --collection slug; images land flat under that directory.
   output_template: "art/{collection}"
 
+  # Folder that relative output paths (output_template, a .prompts
+  # header's output_dir, --output-dir) are anchored at. Renders' drafts/
+  # backups follow them. Env ART_OUTPUT_ROOT overrides.
+  #   project        the project root (default)
+  #   main-checkout  the main checkout of the project's git repo, so art
+  #                  made from a linked worktree survives its removal;
+  #                  input_images not found in the worktree are looked up
+  #                  there too
+  #   <path>         any folder (relative → under the project root)
+  output_root: project
+
 generation:
   images_per_prompt: 1
   default_service: "openai"
